@@ -33,7 +33,9 @@ app.use(helmet({
 app.use(morgan(config.isProd ? 'combined' : 'dev', { skip: (req) => req.url.includes('/public/') || req.url.endsWith('/healthz') }));
 
 const bp = config.basePath;
-app.use((req, res, next) => { Object.assign(res.locals, { bp, user: null, scope: [], csrf: '', flash: '', d: domain, authMode: config.auth.mode, drawer: null }); next(); });
+// Changes on every start, so browsers fetch fresh CSS/JS after each deploy.
+const assetVersion = Date.now().toString(36);
+app.use((req, res, next) => { Object.assign(res.locals, { bp, v: assetVersion, user: null, scope: [], csrf: '', flash: '', d: domain, authMode: config.auth.mode, drawer: null }); next(); });
 
 // Subpath support: every root-relative redirect gets BASE_PATH, so routes can redirect('/x').
 app.use((req, res, next) => {
