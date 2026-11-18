@@ -1,17 +1,18 @@
 <%- include('partials/top') %>
-<% const names = { registration: 'Registration', board: 'Board member', poa: 'Power of attorney', bank: 'Bank account' }; %>
+<% const names = { registration: 'Registration', board: 'Board member', poa: 'Power of attorney', bank: 'Bank account', rules: 'Board rules' }; %>
 <div class="stack" style="gap:18px">
-  <div><a class="small" href="<%= bp %><%= back %>">← <%= country.name %></a><h1 style="margin-top:4px"><%= rec.id === 'new' ? 'Add' : 'Edit' %>: <%= names[kind] %></h1><p class="sub">Direct register corrections by HQ. Every save is logged, and deadlines recalculate from these dates.</p></div>
+  <div><a class="small" href="<%= bp %><%= back %>">← <%= country.name %></a><h1 style="margin-top:4px"><%= rec.id === 'new' ? 'Add' : 'Edit' %>: <%= names[kind] %></h1><p class="sub"><%= kind === 'rules' ? 'What the local law or constitution requires of the board. ECR checks the board against these and raises a task when it falls short.' : 'Direct register corrections by HQ. Every save is logged field by field, and deadlines recalculate from these dates.' %></p></div>
   <form method="post" class="card pad grid-fields" style="grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));align-items:end">
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <% fields.forEach(([k, label, t]) => { %>
       <% if (t === 'bool') { %><label class="check-row"><input type="checkbox" name="<%= k %>" <%= rec.data[k] ? 'checked' : '' %>><%= label %></label>
+      <% } else if (t === 'select') { const opts = fields.find((f) => f[0] === k)[3]; %><label class="field"><%= label %><select class="input" name="<%= k %>"><option value=""></option><% opts.forEach((o) => { %><option <%= rec.data[k] === o ? 'selected' : '' %>><%= o %></option><% }) %></select></label>
       <% } else { %><label class="field"><%= label %><input class="input" type="<%= t === 'date' ? 'date' : 'text' %>" name="<%= k %>" value="<%= rec.data[k] || '' %>"></label><% } %>
     <% }) %>
     <div class="row-flex" style="grid-column:1/-1">
       <button class="btn btn-pri" type="submit">Save</button>
       <a class="btn" href="<%= bp %><%= back %>">Cancel</a>
-      <% if (rec.id !== 'new') { %><button class="btn btn-ret spacer" name="action" value="deactivate" data-confirm="The record leaves the register and stops creating deadlines. It stays in the history." data-ok-label="Remove">Remove from register</button><% } %>
+      <% if (rec.id !== 'new' && rec.id !== 'rules') { %><button class="btn btn-ret spacer" name="action" value="deactivate" data-confirm="The record leaves the register and stops creating deadlines. It stays in the history." data-ok-label="Remove">Remove from register</button><% } %>
     </div>
   </form>
 </div>

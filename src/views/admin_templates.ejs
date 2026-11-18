@@ -1,7 +1,7 @@
 <%- include('partials/top') %>
 <% const meta = { setup: ['Establish', 'Completed once, when a country office registers. Due dates count from the day the country is added.'], annual: ['Operate · annual cycle', 'A new cycle opens for every operating country each year. Due dates count from the day the cycle opens.'], close: ['Close out', 'Used only when a programme closes. Steps sit in four gated stages.'] }; %>
 <div class="stack" style="gap:18px">
-  <div><h1>Requirement templates</h1><p class="sub">One standard checklist per phase, shared by all countries. Add local wording where a country's law differs. Changes apply from each country's next cycle or plan.</p></div>
+  <div><h1>Requirement templates</h1><p class="sub">One standard checklist per phase, shared by all countries. Where a country's law differs, add local wording or a local due date, or add an item for that country only. Changes apply from each country's next cycle or plan.</p></div>
   <nav class="tabs"><% Object.entries(meta).forEach(([k, m]) => { %><a class="tab <%= phase === k ? 'on' : '' %>" href="<%= bp %>/admin/templates?phase=<%= k %>"><%= m[0] %></a><% }) %></nav>
   <p class="muted" style="margin:0"><%= meta[phase][1] %></p>
   <section class="card overflow">
@@ -9,7 +9,7 @@
       <details class="row" style="display:block;<%= t.active ? '' : 'opacity:.55' %>">
         <summary style="display:flex;gap:14px;align-items:center;cursor:pointer;list-style:none">
           <span class="mono muted small" style="width:24px"><%= t.seq %></span>
-          <span class="grow"><%= t.text %><% loc.forEach((l) => { %><span class="meta"><%= l.country_name %>: <%= l.text %></span><% }) %></span>
+          <span class="grow"><% if (t.country_code) { %><span class="chip c-blue" style="margin-right:6px"><%= t.country_name %> only</span><% } %><%= t.text %><% loc.forEach((l) => { %><span class="meta"><%= l.country_name %>: <%= l.text || 'standard wording' %><%= l.due_days ? ' · due +' + l.due_days + ' days' : '' %></span><% }) %></span>
           <span class="muted small"><%= phase === 'close' ? 'Stage ' + t.stage : 'Due +' + t.due_days + ' days' %></span>
           <% if (!t.active) { %><span class="chip c-muted">Retired</span><% } %>
         </summary>
@@ -22,8 +22,9 @@
           </form>
           <form method="post" class="row-flex"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="phase" value="<%= phase %>"><input type="hidden" name="id" value="<%= t.id %>"><input type="hidden" name="action" value="local">
             <select class="input" name="country" style="width:180px" aria-label="Country"><% countries.forEach((c) => { %><option value="<%= c.code %>"><%= c.name %></option><% }) %></select>
-            <input class="input" name="text" placeholder="Local wording for this country (blank removes it)" style="flex:1 1 300px">
-            <button class="btn btn-sm">Save local wording</button>
+            <input class="input" name="text" placeholder="Local wording (blank keeps the standard wording)" style="flex:1 1 300px">
+            <% if (phase !== 'close') { %><label class="row-flex small" style="gap:6px">Due +<input class="input" name="due_days" type="number" min="1" placeholder="std" style="width:80px">days</label><% } %>
+            <button class="btn btn-sm">Save local version</button>
           </form>
         </div>
       </details>
@@ -31,6 +32,7 @@
     <form method="post" class="row-flex" style="padding:14px 18px;border-top:1px solid var(--line2)">
       <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="phase" value="<%= phase %>"><input type="hidden" name="action" value="add">
       <input class="input" name="text" placeholder="New requirement, e.g. Renew data protection registration" style="flex:1 1 360px" aria-label="New requirement">
+      <select class="input" name="country" style="width:170px" aria-label="Applies to"><option value="">All countries</option><% countries.forEach((c) => { %><option value="<%= c.code %>"><%= c.name %> only</option><% }) %></select>
       <% if (phase === 'close') { %><select class="input" name="stage" style="width:160px" aria-label="Stage"><% stages.forEach((s) => { %><option value="<%= s.n %>">Stage <%= s.n %> · <%= s.name %></option><% }) %></select><% } else { %><input class="input" name="due_days" type="number" min="1" value="90" style="width:100px" aria-label="Due after days"><% } %>
       <button class="btn">Add to template</button>
     </form>

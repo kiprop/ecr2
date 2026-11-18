@@ -103,10 +103,14 @@
           <div><div class="label">Authority</div><div><%= g.authority || c.authority || '—' %></div></div>
           <div><div class="label">Registration no.</div><div class="mono"><%= g.reg_number || '—' %></div></div>
           <div><div class="label">Registered</div><div><%= fd(g.registered_on) %></div></div>
-          <div><div class="label">Expires</div><div><%= fd(g.expires_on) %></div></div>
-          <div><div class="label">Renewal</div><div><%= g.renewal_frequency || '—' %></div></div>
+          <div><div class="label">Expires</div><div><%= g.expires_on ? fd(g.expires_on) : 'No expiry date' %></div></div>
+          <div><div class="label">Renewal</div><div><%= g.renewal_frequency || '—' %><% if (!g.expires_on && (g.next_renewal_due || g.last_renewed_on)) { %><span class="muted small" style="display:block"><%= g.next_renewal_due ? 'Next due ' + fd(g.next_renewal_due) : 'Last renewed ' + fd(g.last_renewed_on) %></span><% } %></div></div>
           <div><div class="label">Last legal review</div><div><%= fd(g.last_legal_review) %></div></div>
+          <div><div class="label">Country Director confirmation</div><div><%= fd(g.cd_confirmed_on) %></div></div>
           <div><div class="label">Tax status</div><div><%= g.tax_status || '—' %></div></div>
+          <div><div class="label">Checks</div><div class="small"><span class="chip <%= g.doc_verified ? 'c-green' : 'c-orange' %>"><%= g.doc_verified ? 'Certificate verified' : 'Certificate not verified' %></span> <span class="chip <%= g.ngo_law_on_file ? 'c-green' : 'c-orange' %>"><%= g.ngo_law_on_file ? 'NGO law on file' : 'NGO law not on file' %></span></div></div>
+          <% if (g.documents_link) { %><div><div class="label">Documents</div><div class="small"><% if (/^https?:\/\//.test(g.documents_link)) { %><a href="<%= g.documents_link %>" target="_blank" rel="noopener">Open folder</a><% } else { %><%= g.documents_link %><% } %></div></div><% } %>
+          <% if (g.notes) { %><div style="grid-column:1/-1"><div class="label">Notes</div><div class="small"><%= g.notes %></div></div><% } %>
         </div>
         <% if (g.recent_changes) { %><div class="notice notice-info" style="margin-top:14px"><b>Recent legal or regulatory changes:</b> <%= g.recent_changes %></div><% } %>
         <% } else { %><p class="muted">No registration details recorded yet.</p><% } %>
@@ -114,7 +118,15 @@
       <section class="card overflow"><div class="label" style="padding:13px 18px">Obligations</div><% regItems.forEach((o) => { %><%- include('partials/row', { o, lead: 'none' }) %><% }) %><% if (!regItems.length) { %><div class="empty">Nothing open.</div><% } %></section>
     <% } %>
 
-    <% if (tab === 'board') { %>
+    <% if (tab === 'board') { const rl = c.rules || {}, issues = d.boardIssues(rl, board.map((b) => b.data)); %>
+      <section class="card pad row-flex" style="justify-content:space-between;gap:16px;align-items:flex-start">
+        <div class="stack-s" style="gap:6px"><div class="label">Board rules for <%= c.name %></div>
+          <% if (rl.board_required) { %><div class="small"><%= [rl.board_min ? 'At least ' + rl.board_min + ' members' : null, rl.local_majority ? 'majority local nationals' : null, rl.independent_required ? 'one independent member' : null, rl.term_limit, rl.meeting_frequency && rl.meeting_frequency !== 'Not specified' ? rl.meeting_frequency.toLowerCase() + ' meetings' : null].filter(Boolean).join(' · ') %><% if (rl.source) { %><span class="muted"> · <%= rl.source %></span><% } %></div>
+            <% if (issues.length) { %><div><span class="chip c-red">Not met</span> <span class="small"><%= issues.join('; ') %></span></div><% } else { %><div><span class="chip c-green">Met</span></div><% } %>
+          <% } else { %><div class="small muted"><%= Object.keys(rl).length ? 'No board required by local law.' : 'Not recorded yet.' %></div><% } %>
+        </div>
+        <% if (canEditRegisters) { %><a class="btn btn-sm" href="<%= bp %><%= base %>/registers/rules/rules">Edit rules</a><% } %>
+      </section>
       <section class="card overflow">
         <div class="list-head" style="justify-content:space-between"><div><h2 style="font-size:18px">Board of directors</h2><p class="muted" style="margin:4px 0 0;font-size:14px"><%= board.length %> active members</p></div>
           <div class="row-flex"><% if (canPrepare) { %><a class="btn" href="<%= bp %>/changes/new?type=board&country=<%= code %>">Member joins or leaves</a><% } %><% if (canEditRegisters) { %><a class="btn btn-sm" href="<%= bp %><%= base %>/registers/board/new">Add record</a><% } %></div></div>
@@ -139,14 +151,14 @@
         <div class="list-head" style="justify-content:space-between"><h2 style="font-size:18px">Powers of attorney</h2>
           <div class="row-flex"><% if (canPrepare) { %><a class="btn" href="<%= bp %>/changes/new?type=poa&country=<%= code %>">Grant or renew a POA</a><% } %><% if (canEditRegisters) { %><a class="btn btn-sm" href="<%= bp %><%= base %>/registers/poa/new">Add record</a><% } %></div></div>
         <div class="table-wrap"><table>
-          <thead><tr><th>Holder</th><th>Position</th><th>Scope</th><th>Effective</th><th>Expires</th><th>Notarised</th><th>Registered locally</th><% if (canEditRegisters) { %><th></th><% } %></tr></thead>
+          <thead><tr><th>Holder</th><th>Position</th><th>Scope</th><th>Effective</th><th>Expires</th><th>Notarised</th><th>Registered locally</th><th>CD confirmed</th><% if (canEditRegisters) { %><th></th><% } %></tr></thead>
           <tbody><% poas.forEach((p) => { const x = p.data, dd = d.daysUntil(x.expires_on); %><tr>
             <td style="font-weight:500"><%= x.holder %></td><td><%= x.position || '—' %></td><td class="small"><%= x.scope || '—' %></td><td><%= fd(x.effective_on) %></td>
             <td><%= fd(x.expires_on) %> <% if (dd !== null && dd <= 60) { %><span class="chip <%= dd < 0 ? 'c-red' : 'c-orange' %>"><%= dd < 0 ? 'Expired' : dd + ' days' %></span><% } %></td>
-            <td><%= yes(x.notarised) %></td><td><%= yes(x.registered_locally) %></td>
+            <td><%= yes(x.notarised) %></td><td><%= yes(x.registered_locally) %></td><td><%= yes(x.cd_confirmed) %></td>
             <% if (canEditRegisters) { %><td style="text-align:right"><a class="btn btn-sm" href="<%= bp %><%= base %>/registers/poa/<%= p.id %>">Edit</a></td><% } %>
           </tr><% }) %>
-          <% if (!poas.length) { %><tr><td colspan="8" class="empty">No powers of attorney recorded.</td></tr><% } %></tbody>
+          <% if (!poas.length) { %><tr><td colspan="9" class="empty">No powers of attorney recorded.</td></tr><% } %></tbody>
         </table></div>
       </section>
       <section class="card overflow"><div class="label" style="padding:13px 18px">Obligations</div><% poaItems.forEach((o) => { %><%- include('partials/row', { o, lead: 'none' }) %><% }) %><% if (!poaItems.length) { %><div class="empty">Nothing open.</div><% } %></section>
@@ -164,7 +176,8 @@
               <div><div class="label">Signatories</div><%= x.signatories || '—' %><% if (x.rule) { %> <span class="muted">(<%= x.rule %>)</span><% } %></div>
               <div><div class="label">Dual signature above</div><%= x.threshold || '—' %></div>
               <div><div class="label">Last bank confirmation</div><%= fd(x.last_confirmed_on) %></div>
-              <div><div class="label">Mandate / KYC</div><%= x.mandate_on_file ? 'Mandate' : 'No mandate' %> · <%= x.kyc_on_file ? 'KYC' : 'No KYC' %></div>
+              <div><div class="label">Mandate / KYC</div><%= x.mandate_on_file ? 'Mandate' : 'No mandate' %> · <%= x.kyc_on_file ? 'KYC' : 'No KYC' %><%= x.verified_by_finance ? ' · Verified by Finance' : '' %></div>
+              <% if (x.approval_levels) { %><div style="grid-column:1/-1"><div class="label">Approval levels</div><%= x.approval_levels %></div><% } %>
             </div>
             <div class="row-flex"><% if (canPrepare) { %><a class="btn btn-sm" href="<%= bp %>/changes/new?type=signatory&country=<%= code %>">Change signatories</a><% } %><% if (canEditRegisters) { %><a class="btn btn-sm" href="<%= bp %><%= base %>/registers/bank/<%= a.id %>">Edit</a><% } %></div>
           </section>

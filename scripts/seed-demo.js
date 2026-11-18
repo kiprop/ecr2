@@ -32,7 +32,10 @@ const USERS = [
   if (have && !force) { console.log('[demo] countries already exist; use --force to wipe and reseed'); process.exit(0); }
   if (force) {
     await db.q(`ALTER TABLE events DISABLE TRIGGER events_no_update`);
-    await db.q(`TRUNCATE inbox, notifications, documents, obligations, register_records, cycles, template_local, user_countries, events, countries RESTART IDENTITY CASCADE`);
+    // Countries are deleted, not truncated: TRUNCATE ... CASCADE would also empty the templates table.
+    await db.q(`TRUNCATE inbox, notifications, documents, obligations, register_records, cycles, template_local, user_countries, events RESTART IDENTITY CASCADE`);
+    await db.q(`DELETE FROM templates WHERE country_code IS NOT NULL`);
+    await db.q(`DELETE FROM countries`);
     await db.q(`DELETE FROM users WHERE email LIKE '%.demo@pedaids.org'`);
     await db.q(`ALTER TABLE events ENABLE TRIGGER events_no_update`);
     if (clear) { console.log('[demo] cleared: countries, registers, obligations, documents, events and sample people removed'); await db.pool.end(); return; }

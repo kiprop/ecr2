@@ -324,26 +324,38 @@ module.exports = function appRoutes(csrfCheck) {
   });
 
   // ------------------------------------------------------------ registers (HQ keeps them accurate)
+  const FREQS = ['Annual', 'Biennial', 'Every 3 years', 'Every 5 years', 'No renewal (declaration regime)'];
   const REG_FIELDS = {
-    registration: [['category', 'Category / legal entity type'], ['authority', 'Registering authority'], ['reg_number', 'Registration number'], ['registered_on', 'Registered on', 'date'], ['expires_on', 'Expires on', 'date'], ['renewal_frequency', 'Renewal frequency'], ['last_legal_review', 'Last legal review', 'date'], ['tax_status', 'Tax identification / exemption status'], ['notes', 'Notes']],
+    registration: [['category', 'Category / legal entity type'], ['authority', 'Registering authority'], ['reg_number', 'Registration number'], ['registered_on', 'Registered on', 'date'],
+      ['expires_on', 'Certificate expires on (if it has a date)', 'date'], ['renewal_frequency', 'Renewal frequency', 'select', FREQS], ['last_renewed_on', 'Last renewed on', 'date'], ['next_renewal_due', 'Next renewal due (if no expiry date)', 'date'],
+      ['last_legal_review', 'Last legal review', 'date'], ['cd_confirmed_on', 'Last Country Director confirmation', 'date'], ['tax_status', 'Tax identification / exemption status'], ['documents_link', 'Where the documents are kept (link)'],
+      ['doc_verified', 'Latest certificate verified by the country office', 'bool'], ['ngo_law_on_file', 'Copy of the local NGO law on file', 'bool'], ['recent_changes', 'Recent legal or regulatory changes'], ['notes', 'Notes']],
     board: [['name', 'Name'], ['position', 'Position or role'], ['appointed_on', 'Appointed on', 'date'], ['term_ends', 'Term ends', 'date'], ['local_national', 'Local national', 'bool'], ['independent', 'Independent member', 'bool'], ['coi_on_file', 'Conflict-of-interest declaration on file', 'bool'], ['vetting_done', 'Background check done', 'bool']],
-    poa: [['holder', 'Holder'], ['position', 'Position or title'], ['scope', 'Scope of authority'], ['effective_on', 'Effective on', 'date'], ['expires_on', 'Expires on', 'date'], ['notarised', 'Notarised or apostilled', 'bool'], ['registered_locally', 'Registered with local authority', 'bool']],
-    bank: [['bank', 'Bank'], ['account_type', 'Account type'], ['currency', 'Currency'], ['last4', 'Last 4 digits of account'], ['signatories', 'Signatories (comma separated)'], ['rule', 'Signing rule, e.g. any 2'], ['threshold', 'Dual signature threshold'], ['last_confirmed_on', 'Last bank confirmation', 'date'], ['mandate_on_file', 'Bank mandate on file', 'bool'], ['kyc_on_file', 'AML/KYC documents on file', 'bool']],
+    poa: [['holder', 'Holder'], ['position', 'Position or title'], ['scope', 'Scope of authority'], ['entity_covered', 'Legal entity covered'], ['effective_on', 'Effective on', 'date'], ['expires_on', 'Expires on', 'date'], ['notarised', 'Notarised or apostilled', 'bool'], ['registered_locally', 'Registered with local authority', 'bool'], ['cd_confirmed', 'Confirmed by the Country Director', 'bool']],
+    bank: [['bank', 'Bank'], ['account_type', 'Account type'], ['currency', 'Currency'], ['last4', 'Last 4 digits of account'], ['signatories', 'Signatories (comma separated)'], ['rule', 'Signing rule, e.g. any 2'], ['threshold', 'Dual signature threshold'], ['approval_levels', 'Approval levels'], ['last_confirmed_on', 'Last bank confirmation', 'date'],
+      ['mandate_on_file', 'Bank mandate on file', 'bool'], ['kyc_on_file', 'AML/KYC documents on file', 'bool'], ['board_member_required', 'Local rules require a board member as signatory', 'bool'], ['poa_required', 'Bank requires a POA for signatories', 'bool'], ['verified_by_finance', 'Latest verified by Finance', 'bool']],
+    rules: [['board_required', 'Local law requires a board', 'bool'], ['board_min', 'Minimum number of members'], ['local_majority', 'Local nationals must be the majority', 'bool'], ['independent_required', 'At least one independent member required', 'bool'], ['term_limit', 'Term length and limit, e.g. two terms of three years'], ['meeting_frequency', 'Meetings required', 'select', ['Quarterly', 'Twice a year', 'Annual', 'Not specified']], ['source', 'Where the rule comes from (law, constitution)']],
   };
-  const REG_TAB = { registration: 'reg', board: 'board', poa: 'poa', bank: 'bank' };
+  const LABEL_OF = (kind, k) => ((REG_FIELDS[kind] || []).find((f) => f[0] === k) || [k, k])[1];
+  // "Expires on: 2026-01-31 → 2027-01-31; COI on file: no → yes"
+  function diffText(kind, before, after) {
+    const show = (v) => (v === true ? 'yes' : v === false ? 'no' : v == null || v === '' ? '(blank)' : String(v));
+    return Object.keys(after).filter((k) => show(before[k]) !== show(after[k]) && !(before[k] == null && after[k] === false)).map((k) => `${LABEL_OF(kind, k)}: ${show(before[k])} → ${show(after[k])}`).join('; ');
+  }
+  const REG_TAB = { registration: 'reg', board: 'board', poa: 'poa', bank: 'bank', rules: 'board' };
 
   r.get('/countries/:code/registers/:kind/:id', async (req, res) => {
     const code = req.params.code.toUpperCase(); const kind = req.params.kind;
     if (!D.canReview(req.user) || !REG_FIELDS[kind] || !inScope(req, code)) throw httpError(403, 'Not allowed.');
     const country = await db.one(`SELECT * FROM countries WHERE code=$1`, [code]);
-    const rec = req.params.id === 'new' ? { id: 'new', data: {} } : await db.one(`SELECT * FROM register_records WHERE id=$1 AND country_code=$2 AND kind=$3`, [req.params.id, code, kind]);
+    const rec = kind === 'rules' ? { id: 'rules', data: country ? country.rules || {} : {} } : req.params.id === 'new' ? { id: 'new', data: {} } : await db.one(`SELECT * FROM register_records WHERE id=$1 AND country_code=$2 AND kind=$3`, [req.params.id, code, kind]);
     if (!rec) throw httpError(404, 'Not found');
     res.render('register_edit', { title: 'Edit register', nav: 'overview', country, kind, rec, fields: REG_FIELDS[kind], back: `/countries/${code}?tab=${REG_TAB[kind]}` });
   });
   r.post('/countries/:code/registers/:kind/:id', async (req, res) => {
     const code = req.params.code.toUpperCase(); const kind = req.params.kind;
     if (!D.canReview(req.user) || !REG_FIELDS[kind] || !inScope(req, code)) throw httpError(403, 'Not allowed.');
-    if (req.body.action === 'deactivate' && req.params.id !== 'new') {
+    if (req.body.action === 'deactivate' && req.params.id !== 'new' && kind !== 'rules') {
       await db.q(`UPDATE register_records SET active=false, updated_at=now() WHERE id=$1 AND country_code=$2`, [req.params.id, code]);
       await D.audit(req.user.id, 'register.removed', `${kind} record #${req.params.id} removed`, code);
       req.flash('Record removed from the register. It stays in the history.');
@@ -352,12 +364,23 @@ module.exports = function appRoutes(csrfCheck) {
     const data = {};
     REG_FIELDS[kind].forEach(([k, , t]) => { data[k] = t === 'bool' ? req.body[k] === 'on' : (String(req.body[k] || '').trim().slice(0, 500) || null); });
     if (data.last4) data.last4 = data.last4.replace(/\D/g, '').slice(-4);
+    if (kind === 'rules') {
+      const before = (await db.one(`SELECT rules FROM countries WHERE code=$1`, [code])).rules || {};
+      await db.q(`UPDATE countries SET rules=$2 WHERE code=$1`, [code, JSON.stringify(data)]);
+      await D.audit(req.user.id, 'register.edited', `board rules: ${diffText(kind, before, data) || 'no change'}`, code);
+      await D.syncCountry(code);
+      req.flash('Board rules saved. The board is checked against them.');
+      return res.redirect(`/countries/${code}?tab=board`);
+    }
     if (req.params.id === 'new') {
       await db.q(`INSERT INTO register_records (country_code, kind, data) VALUES ($1,$2,$3)`, [code, kind, JSON.stringify(data)]);
       await D.audit(req.user.id, 'register.added', `${kind}: ${data.name || data.holder || data.bank || data.reg_number || 'record'}`, code);
     } else {
-      await db.q(`UPDATE register_records SET data=$3, updated_at=now() WHERE id=$1 AND country_code=$2`, [req.params.id, code, JSON.stringify(data)]);
-      await D.audit(req.user.id, 'register.edited', `${kind}: ${data.name || data.holder || data.bank || data.reg_number || 'record'}`, code);
+      const prev = await db.one(`SELECT data FROM register_records WHERE id=$1 AND country_code=$2`, [req.params.id, code]);
+      // Keep fields this form doesn't show (e.g. set by an accepted change), and log what changed field by field.
+      const merged = { ...(prev ? prev.data : {}), ...data };
+      await db.q(`UPDATE register_records SET data=$3, updated_at=now() WHERE id=$1 AND country_code=$2`, [req.params.id, code, JSON.stringify(merged)]);
+      await D.audit(req.user.id, 'register.edited', `${kind} ${data.name || data.holder || data.bank || data.reg_number || 'record'}: ${diffText(kind, prev ? prev.data : {}, data) || 'no change'}`, code);
     }
     await D.syncCountry(code);
     req.flash('Register saved. Deadlines have been recalculated.');

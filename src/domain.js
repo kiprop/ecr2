@@ -72,7 +72,9 @@ function fieldsFor(o) {
   const d = (k, label) => ({ k, label, type: 'date' });
   const t = (k, label) => ({ k, label, type: 'text' });
   const map = {
-    registration_renewal: [d('completed_on', 'Renewal date'), d('new_expiry', 'New expiry date')],
+    registration_renewal: [d('completed_on', 'Renewal date'), d('new_expiry', 'New expiry date (if the certificate has one)')],
+    cd_confirmation: [d('confirmed_on', 'Confirmed on')],
+    board_composition: [d('completed_on', 'Resolved on')],
     legal_review: [d('completed_on', 'Review date'), t('changes', 'Legal or regulatory changes found (if any)')],
     board_term: [d('decision_on', 'Decision date'), { k: 'outcome', label: 'Outcome', type: 'select', options: ['Reappointed', 'Replaced (report the change too)', 'Left the board'] }, d('new_term_end', 'New term end (if reappointed)')],
     board_coi: [d('received_on', 'Declaration signed on')],
@@ -126,6 +128,11 @@ async function syncCountry(code, c = db) {
     const d = r.data || {};
     if (r.kind === 'registration') {
       if (within(d.expires_on)) await upsertSourceObligation(c, code, 'registration', 'registration_renewal', r.id, 'Renew Certificate of Registration', `Renew the registration with the ${d.authority || country.authority || 'registering authority'} before it expires on ${fmtDate(d.expires_on)}.`, d.expires_on);
+      // No expiry on the certificate: renewal comes from the next-renewal date, or the last renewal plus the frequency.
+      const months = FREQ_MONTHS[d.renewal_frequency];
+      const renewDue = !d.expires_on && d.renewal_required !== false ? (d.next_renewal_due || (d.last_renewed_on && months ? addMonths(d.last_renewed_on, months) : null)) : null;
+      if (within(renewDue)) await upsertSourceObligation(c, code, 'registration', 'registration_renewal', r.id, `Renew registration (${d.renewal_frequency || 'periodic'})`, `Lodge the renewal with the ${d.authority || country.authority || 'registering authority'} by ${fmtDate(renewDue)}.`, renewDue);
+      if (d.cd_confirmed_on && within(addDays(d.cd_confirmed_on, 365))) await upsertSourceObligation(c, code, 'registration', 'cd_confirmation', r.id, 'Country Director confirms registration details', 'The Country Director confirms the registration record, certificate and authority details are current, and that the latest certificate has been checked.', addDays(d.cd_confirmed_on, 365));
       const lr = d.last_legal_review ? addDays(d.last_legal_review, 365) : addDays(todayISO(), 60);
       if (within(lr)) await upsertSourceObligation(c, code, 'registration', 'legal_review', r.id, 'Annual legal review of NGO law', 'Check for changes to NGO, tax and labour law that affect the registration, and record what you found.', lr);
     }
@@ -139,7 +146,21 @@ async function syncCountry(code, c = db) {
       if (within(due)) await upsertSourceObligation(c, code, 'banking', 'bank_confirmation', r.id, `Bank confirmation: ${d.bank} (${d.currency || ''})`.replace(' ()', ''), 'Get written confirmation from the bank of the current signatories and mandate.', due);
     }
   }
+  const issues = boardIssues(country.rules || {}, recs.filter((r) => r.kind === 'board').map((r) => r.data || {}));
+  const openComp = await c.one(`SELECT id FROM obligations WHERE country_code=$1 AND source_type='board_composition' AND status IN ('todo','submitted','returned')`, [code]);
+  if (issues.length && !openComp) await upsertSourceObligation(c, code, 'board', 'board_composition', 0, 'Board does not meet the local rules', `${issues.join('. ')}. Appoint members (and report the change) so the board meets the law.`, addDays(todayISO(), s.coi_due_days));
 }
+// What the local law requires of the board, checked against the active members.
+function boardIssues(rules, members) {
+  if (!rules.board_required || !members.length) return []; // an empty register is missing data, not a breach
+  const out = [];
+  if (rules.board_min && members.length < Number(rules.board_min)) out.push(`${members.length} of the ${rules.board_min} members required`);
+  if (rules.independent_required && !members.some((m) => m.independent)) out.push('No independent member');
+  if (rules.local_majority && members.length && members.filter((m) => m.local_national).length * 2 <= members.length) out.push('Local nationals are not a majority');
+  return out;
+}
+const FREQ_MONTHS = { Annual: 12, Biennial: 24, 'Every 3 years': 36, 'Every 5 years': 60 };
+function addMonths(iso, n) { const [y, m, dd] = iso.split('-').map(Number); const dt = new Date(Date.UTC(y, m - 1 + n, 1)); const last = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 0)).getUTCDate(); dt.setUTCDate(Math.min(dd, last)); return dt.toISOString().slice(0, 10); }
 async function syncAll() { const cs = await db.q(`SELECT code FROM countries`); for (const c of cs) await syncCountry(c.code); }
 
 // ---------------------------------------------------------------- cycles
@@ -149,12 +170,12 @@ async function openPlan(c, code, kind, label, userId) {
   const exists = await c.one(`SELECT id FROM cycles WHERE country_code=$1 AND kind=$2 AND label=$3`, [code, kind, label]);
   if (exists) return null;
   const cyc = await c.one(`INSERT INTO cycles (country_code, kind, label) VALUES ($1,$2,$3) RETURNING id, opened_on`, [code, kind, label]);
-  const tpls = await c.q(`SELECT t.*, l.text AS local FROM templates t LEFT JOIN template_local l ON l.template_id=t.id AND l.country_code=$2 WHERE t.phase=$1 AND t.active ORDER BY t.seq`, [kind, code]);
+  const tpls = await c.q(`SELECT t.*, l.text AS local, l.due_days AS local_due FROM templates t LEFT JOIN template_local l ON l.template_id=t.id AND l.country_code=$2 WHERE t.phase=$1 AND t.active AND (t.country_code IS NULL OR t.country_code=$2) ORDER BY t.seq`, [kind, code]);
   const area = kind;
   for (const t of tpls) {
     const title = t.local || t.text;
     await c.q(`INSERT INTO obligations (country_code, cycle_id, area, template_id, seq, stage, title, requirement, due_date) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-      [code, cyc.id, area, t.id, t.seq, t.stage, title, title + '.', kind === 'close' ? null : addDays(cyc.opened_on, t.due_days)]);
+      [code, cyc.id, area, t.id, t.seq, t.stage, title, title + '.', kind === 'close' ? null : addDays(cyc.opened_on, t.local_due || t.due_days)]);
   }
   await audit(userId, `${kind}.opened`, `${label} opened with ${tpls.length} items`, code, null, c);
   return cyc.id;
@@ -180,7 +201,8 @@ async function applyAccepted(c, o, userId) {
   const rec = o.source_id ? await c.one(`SELECT * FROM register_records WHERE id=$1`, [o.source_id]) : null;
   const patch = async (id, obj) => c.q(`UPDATE register_records SET data = data || $2::jsonb, updated_at=now() WHERE id=$1`, [id, JSON.stringify(obj)]);
   switch (o.source_type) {
-    case 'registration_renewal': if (rec && p.new_expiry) await patch(rec.id, { expires_on: p.new_expiry, last_renewal: p.completed_on || todayISO() }); break;
+    case 'registration_renewal': if (rec) await patch(rec.id, { last_renewed_on: p.completed_on || todayISO(), next_renewal_due: null, ...(p.new_expiry ? { expires_on: p.new_expiry } : {}) }); break;
+    case 'cd_confirmation': if (rec) await patch(rec.id, { cd_confirmed_on: p.confirmed_on || todayISO(), doc_verified: true }); break;
     case 'legal_review': if (rec) await patch(rec.id, { last_legal_review: p.completed_on || todayISO(), recent_changes: p.changes || '' }); break;
     case 'board_term':
       if (rec && p.new_term_end && /Reappointed/.test(p.outcome || '')) await patch(rec.id, { term_ends: p.new_term_end });
@@ -280,7 +302,7 @@ async function notifyInbox(c, userIds, n, actorId) {
 
 module.exports = {
   ROLES, canReview, isAdmin, isPreparer, loadScope, AREAS, RESTRICTED_AREAS, STATUS, PHASES, CLOSE_STAGES, CHANGES,
-  todayISO, addDays, daysUntil, fmtDate, fmtShort, monthName, fmtWhen, decorate, fieldsFor,
+  todayISO, addDays, addMonths, boardIssues, FREQ_MONTHS, daysUntil, fmtDate, fmtShort, monthName, fmtWhen, decorate, fieldsFor,
   audit, getSettings, DEFAULT_SETTINGS, syncCountry, syncAll, openPlan, openAnnualCycles, currentCycle, fyLabel,
   applyAccepted, startClose, countryTeam, reviewers, leadersFor, notifyInbox,
 };

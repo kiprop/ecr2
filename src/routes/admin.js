@@ -90,7 +90,7 @@ r.get('/directory', async (req, res) => {
 // ------------------------------------------------------------ templates
 r.get('/templates', async (req, res) => {
   const phase = ['setup', 'annual', 'close'].includes(req.query.phase) ? req.query.phase : 'annual';
-  const items = await db.q(`SELECT * FROM templates WHERE phase=$1 ORDER BY active DESC, seq`, [phase]);
+  const items = await db.q(`SELECT t.*, c.name AS country_name FROM templates t LEFT JOIN countries c ON c.code=t.country_code WHERE t.phase=$1 ORDER BY t.active DESC, (t.country_code IS NOT NULL), c.name NULLS FIRST, t.seq`, [phase]);
   const locals = await db.q(`SELECT l.*, c.name AS country_name FROM template_local l JOIN countries c ON c.code=l.country_code JOIN templates t ON t.id=l.template_id WHERE t.phase=$1`, [phase]);
   const countries = await db.q(`SELECT code, name FROM countries ORDER BY name`);
   res.render('admin_templates', { title: 'Templates', nav: 'templates', phase, items, locals, countries, stages: D.CLOSE_STAGES });
@@ -102,8 +102,9 @@ r.post('/templates', async (req, res) => {
     const text = String(b.text || '').trim().slice(0, 500);
     if (!text) { req.flash('Type the requirement first.'); return res.redirect(`/admin/templates?phase=${phase}`); }
     const n = await db.one(`SELECT COALESCE(max(seq),0)+1 AS n FROM templates WHERE phase=$1`, [phase]);
-    await db.q(`INSERT INTO templates (phase, seq, text, due_days, stage) VALUES ($1,$2,$3,$4,$5)`, [phase, n.n, text, Number(b.due_days) || 90, phase === 'close' ? (Number(b.stage) || 4) : null]);
-    await D.audit(req.user.id, 'template.added', `${phase}: ${text}`);
+    const only = b.country ? (await db.one(`SELECT code FROM countries WHERE code=$1`, [b.country]) || {}).code || null : null;
+    await db.q(`INSERT INTO templates (phase, seq, text, due_days, stage, country_code) VALUES ($1,$2,$3,$4,$5,$6)`, [phase, n.n, text, Number(b.due_days) || 90, phase === 'close' ? (Number(b.stage) || 4) : null, only]);
+    await D.audit(req.user.id, 'template.added', `${phase}${only ? ' (' + only + ' only)' : ''}: ${text}`);
     req.flash('Added. It applies from each country’s next cycle or plan.');
   }
   if (b.action === 'save') {
@@ -117,11 +118,12 @@ r.post('/templates', async (req, res) => {
     req.flash('Template item updated.');
   }
   if (b.action === 'local') {
-    const text = String(b.text || '').trim().slice(0, 500);
-    if (text) await db.q(`INSERT INTO template_local VALUES ($1,$2,$3) ON CONFLICT (template_id, country_code) DO UPDATE SET text=EXCLUDED.text`, [b.id, b.country, text]);
+    const text = String(b.text || '').trim().slice(0, 500) || null;
+    const due = Number(b.due_days) > 0 ? Number(b.due_days) : null;
+    if (text || due) await db.q(`INSERT INTO template_local (template_id, country_code, text, due_days) VALUES ($1,$2,$3,$4) ON CONFLICT (template_id, country_code) DO UPDATE SET text=EXCLUDED.text, due_days=EXCLUDED.due_days`, [b.id, b.country, text, due]);
     else await db.q(`DELETE FROM template_local WHERE template_id=$1 AND country_code=$2`, [b.id, b.country]);
-    await D.audit(req.user.id, 'template.localised', `${b.country} #${b.id}: ${text || '(removed)'}`);
-    req.flash('Local wording saved.');
+    await D.audit(req.user.id, 'template.localised', `${b.country} #${b.id}: ${text || '(standard wording)'}${due ? ', due +' + due + ' days' : ''}`);
+    req.flash('Local version saved.');
   }
   res.redirect(`/admin/templates?phase=${phase}`);
 });
