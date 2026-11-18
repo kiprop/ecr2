@@ -6,6 +6,11 @@ const db = require('./db');
 const { audit } = require('./domain');
 
 const router = express.Router();
+const HINT = 'ecr2.hint';
+function readHint(req) {
+  const m = (req.headers.cookie || '').split(/;\s*/).find((c) => c.startsWith(HINT + '='));
+  return m ? decodeURIComponent(m.slice(HINT.length + 1)) : '';
+}
 const redirectUri = () => `${config.appBaseUrl}${config.basePath}/auth/callback`;
 
 let clientPromise = null;
@@ -32,6 +37,8 @@ router.get('/login', async (req, res) => {
 
 router.get('/auth/login', async (req, res, next) => {
   if (config.auth.mode === 'mock') return res.redirect('/login');
+  req.cookies_hint = readHint(req);
+  if (req.query.switch === '1') res.clearCookie(HINT, { path: config.basePath || '/' });
   try {
     const client = await getClient();
     const codeVerifier = generators.codeVerifier();
@@ -42,6 +49,9 @@ router.get('/auth/login', async (req, res, next) => {
       scope: 'openid profile email', code_challenge: generators.codeChallenge(codeVerifier), code_challenge_method: 'S256', state, nonce,
       // Silent single sign-on when the browser already has a Microsoft session; the account picker only after an explicit sign-out or "switch account".
       ...(req.query.switch === '1' ? { prompt: 'select_account' } : {}),
+      // Tell Microsoft which account to use, so it skips the picker even without a browser session.
+      ...(req.query.switch !== '1' && /^[^@\s]+@pedaids\.org$/i.test(req.cookies_hint || '') ? { login_hint: req.cookies_hint } : {}),
+      domain_hint: 'pedaids.org',
     });
     req.session.save((err) => (err ? next(err) : res.redirect(url)));
   } catch (e) { next(e); }
@@ -76,6 +86,7 @@ async function finishSignIn(req, res, { email, name, oid, returnTo }) {
   req.session.regenerate((err) => {
     if (err) throw err;
     req.session.userId = user.id;
+    res.cookie(HINT, email, { httpOnly: true, sameSite: 'lax', secure: config.isProd, path: config.basePath || '/', maxAge: 1000 * 60 * 60 * 24 * 180 });
     req.session.save(() => res.redirect(returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : '/'));
   });
 }
