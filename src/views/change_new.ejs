@@ -1,15 +1,15 @@
 <%- include('partials/top') %>
-<div class="stack" style="gap:18px;max-width:760px">
+<div class="stack" style="gap:18px">
   <div><a class="small" href="<%= bp %>/">← Home</a><h1 style="margin-top:4px"><%= def ? def.title : 'What changed?' %></h1><p class="sub"><%= def ? 'Tell us once. HQ reviews it, then the register and calendar update.' : 'Pick the kind of change. Each one asks only for what HQ needs.' %></p></div>
 
   <% if (!def) { %>
-    <div class="stack-s">
+    <div class="grid-cards" style="grid-template-columns:repeat(auto-fill,minmax(320px,1fr))">
       <% Object.entries(changes).forEach(([k, c]) => { %>
         <a class="opt" href="<%= bp %>/changes/new?type=<%= k %>&country=<%= code %>" style="text-decoration:none;color:inherit;align-items:center"><span style="flex:1"><b style="display:block"><%= c.title %></b><span class="muted small"><%= c.desc %></span></span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A939C" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></a>
       <% }) %>
     </div>
   <% } else { %>
-  <form method="post" action="<%= bp %>/changes" enctype="multipart/form-data" class="stack-s" style="gap:18px">
+  <form method="post" action="<%= bp %>/changes" enctype="multipart/form-data" class="form-grid">
     <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="type" value="<%= type %>">
     <section class="card pad stack-s" style="gap:14px">
       <div class="row-flex"><span class="dot dot-now">1</span><b>Details</b></div>

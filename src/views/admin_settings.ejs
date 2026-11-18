@@ -1,8 +1,8 @@
 <%- include('partials/top') %>
 <% const months = ['January','February','March','April','May','June','July','August','September','October','November','December']; %>
-<div class="stack" style="gap:18px;max-width:860px">
+<div class="stack" style="gap:18px">
   <div><h1>Settings</h1><p class="sub">Rules that apply to every country.</p></div>
-  <form method="post" class="stack-s" style="gap:18px">
+  <form method="post" class="form-grid">
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <section class="card pad stack-s">
       <b>Reminder lead times</b>
@@ -25,7 +25,7 @@
       <div style="flex:1 1 300px"><b>Weekly digest</b><div class="muted small">Monday email to each person summarising what needs them.</div></div>
       <label class="check-row"><input type="checkbox" name="digest" <%= s.digest ? 'checked' : '' %>>On</label>
     </section>
-    <div><button class="btn btn-pri">Save settings</button></div>
+    <div class="span-all"><button class="btn btn-pri">Save settings</button></div>
   </form>
 
   <section class="card pad row-flex">

@@ -29,6 +29,8 @@ h1{margin:0;font-size:27px}
 .grid-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
 .grid-kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
 .grid-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px 24px}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(380px,100%),1fr));gap:18px;align-items:start}
+.form-grid>.span-all{grid-column:1/-1}
 .split{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start}
 .split>.main-col{flex:999 1 520px;min-width:0}.split>.side-col{flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:22px}
 
@@ -51,7 +53,7 @@ h1{margin:0;font-size:27px}
 .search{position:relative;flex:1 1 320px;max-width:520px}
 .search svg{position:absolute;left:12px;top:13px}
 .search input{padding-left:36px;background:var(--bg)}
-.content{padding:26px clamp(16px,3vw,40px) 64px;max-width:1320px;width:100%}
+.content{padding:26px clamp(16px,3vw,40px) 64px;width:100%}
 
 /* lists */
 .list-head{padding:15px 18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}

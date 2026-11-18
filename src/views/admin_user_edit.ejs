@@ -1,8 +1,8 @@
 <%- include('partials/top') %>
 <% const isNew = target.id === 'new'; %>
-<div class="stack" style="gap:18px;max-width:760px">
+<div class="stack" style="gap:18px">
   <div><a class="small" href="<%= bp %>/admin/users">← Users &amp; access</a><h1 style="margin-top:4px"><%= isNew ? 'Invite a person' : target.name %></h1><p class="sub"><%= isNew ? 'EGPAF staff only. They sign in with their Microsoft account; no password is created.' : target.email %></p></div>
-  <form method="post" action="<%= bp %>/admin/users/<%= target.id %>" class="stack-s" style="gap:18px">
+  <form method="post" action="<%= bp %>/admin/users/<%= target.id %>" class="form-grid">
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <% if (isNew) { %>
       <section class="card pad stack-s" style="gap:14px">
@@ -30,7 +30,7 @@
         <% countries.forEach((c) => { %><label class="pill"><input type="checkbox" name="countries" value="<%= c.code %>" <%= target.countries.includes(c.code) ? 'checked' : '' %>><%= c.name %></label><% }) %>
       </div>
     </section>
-    <div class="row-flex">
+    <div class="row-flex span-all">
       <button class="btn btn-pri" type="submit"><%= isNew ? 'Send invitation' : 'Save changes' %></button>
       <a class="btn" href="<%= bp %>/admin/users">Cancel</a>
       <% if (!isNew && target.id !== user.id) { %><button class="btn btn-ret spacer" name="action" value="toggle" data-confirm="<%= target.status === 'inactive' ? 'Reactivate' : 'Deactivate' %> <%= target.name %>?"><%= target.status === 'inactive' ? 'Reactivate' : 'Deactivate' %></button><% } %>
