@@ -52,6 +52,7 @@ r.post('/users/:id', async (req, res) => {
       const u = await c.one(`INSERT INTO users (email, name, title, role, status) VALUES ($1,$2,$3,$4,'invited') RETURNING id`, [email, name, (b.title || '').slice(0, 200) || null, role]);
       for (const cc of countries) await c.q(`INSERT INTO user_countries VALUES ($1,$2)`, [u.id, cc]);
       await D.audit(req.user.id, 'user.invited', `invited ${name} as ${D.ROLES[role].label} for ${names}`, null, null, c);
+      await D.notifyInbox(c, [u.id], { kind: 'welcome', title: 'Welcome to ECR 2.0', body: `${req.user.name} gave you access as ${D.ROLES[role].label} for ${names}.`, link: '/' });
     });
     await graph.sendMail(email, 'You have access to the EGPAF Compliance Registry (ECR 2.0)',
       `<p>Hello ${name},</p><p>${req.user.name} has given you access to ECR 2.0 as <b>${D.ROLES[role].label}</b> for ${names}.</p><p>Sign in with your EGPAF Microsoft account: <a href="${config.appBaseUrl}${config.basePath}/">${config.appBaseUrl}${config.basePath}/</a></p>`);
@@ -135,6 +136,7 @@ r.post('/countries', async (req, res) => {
   const fields = [String(b.name || '').trim(), b.entity_type || null, b.authority || null, b.registered_on || null, b.currency || null];
   if (b.action === 'add') {
     if (!/^[A-Z]{3}$/.test(code) || !fields[0]) { req.flash('Give a 3-letter code (e.g. ZMB) and a name.'); return res.redirect('/admin/countries'); }
+    if (await db.one(`SELECT 1 FROM countries WHERE code=$1`, [code])) { req.flash(`${code} already exists. Edit it in the table instead.`); return res.redirect('/admin/countries'); }
     const phase = b.phase === 'establish' ? 'establish' : 'operate';
     await db.tx(async (c) => {
       await c.q(`INSERT INTO countries (code, name, phase, entity_type, authority, registered_on, currency) VALUES ($1,$2,$3,$4,$5,$6,$7)`, [code, ...fields.slice(0, 1), phase, ...fields.slice(1)]);

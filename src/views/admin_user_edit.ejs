@@ -33,7 +33,7 @@
     <div class="row-flex span-all">
       <button class="btn btn-pri" type="submit"><%= isNew ? 'Send invitation' : 'Save changes' %></button>
       <a class="btn" href="<%= bp %>/admin/users">Cancel</a>
-      <% if (!isNew && target.id !== user.id) { %><button class="btn btn-ret spacer" name="action" value="toggle" data-confirm="<%= target.status === 'inactive' ? 'Reactivate' : 'Deactivate' %> <%= target.name %>?"><%= target.status === 'inactive' ? 'Reactivate' : 'Deactivate' %></button><% } %>
+      <% if (!isNew && target.id !== user.id) { %><button class="btn btn-ret spacer" name="action" value="toggle" data-confirm="<%= target.status === 'inactive' ? target.name + ' will be able to sign in again.' : target.name + ' will be signed out and can no longer sign in. Their history is kept.' %>" data-ok-label="<%= target.status === 'inactive' ? 'Reactivate' : 'Deactivate' %>"><%= target.status === 'inactive' ? 'Reactivate' : 'Deactivate' %></button><% } %>
     </div>
   </form>
 </div>

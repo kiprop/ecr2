@@ -38,7 +38,7 @@
     <% cycles.forEach((c) => { %><div class="row-flex small"><span class="mono" style="width:80px"><%= c.label %></span><span class="muted"><%= c.n %> countries · <%= c.signed %> signed off</span></div><% }) %>
     <form method="post" class="row-flex"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="open_cycle">
       <input class="input" name="label" value="<%= nextLabel %>" style="width:120px" aria-label="Cycle label">
-      <button class="btn" data-confirm="Open this cycle for every operating country that does not have it yet?">Open cycle now</button>
+      <button class="btn" data-confirm="This opens the cycle for every operating country that does not have it yet, with due dates counted from today." data-ok-label="Open cycle">Open cycle now</button>
       <span class="muted small">Normally automatic on the 1st of the cycle month.</span>
     </form>
   </section>

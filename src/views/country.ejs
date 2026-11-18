@@ -195,7 +195,7 @@
         <div class="grid-kpi"><% d.CLOSE_STAGES.forEach((s) => { %><div style="border:1px solid var(--line);border-radius:10px;padding:14px"><div class="label">Stage <%= s.n %></div><b style="display:block;margin-top:3px"><%= s.name %></b></div><% }) %></div>
         <% if (c.close_status === 'requested') { %><span class="chip c-blue" style="align-self:flex-start">Close-out requested · waiting for HQ approval</span><% } %>
         <% if (canReview) { %>
-          <form method="post" action="<%= bp %><%= base %>/close" class="row-flex"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-pri" data-confirm="Start the close-out plan for <%= c.name %>? The country moves to the Close out phase."><%= c.close_status === 'requested' ? 'Approve and start the close-out plan' : 'Start a close-out plan' %></button><span class="muted small">The annual cycle keeps running until stage 4.</span></form>
+          <form method="post" action="<%= bp %><%= base %>/close" class="row-flex"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-pri" data-confirm="<%= c.name %> moves to the Close out phase and the four-stage plan opens. The annual cycle keeps running until stage 4." data-ok-label="Start close-out"><%= c.close_status === 'requested' ? 'Approve and start the close-out plan' : 'Start a close-out plan' %></button><span class="muted small">The annual cycle keeps running until stage 4.</span></form>
         <% } else if (canPrepare && c.close_status === 'none') { %>
           <form method="post" action="<%= bp %><%= base %>/close" class="row-flex"><input type="hidden" name="_csrf" value="<%= csrf %>"><input class="input" name="reason" placeholder="Why the programme is closing (award end, transition...)" style="flex:1 1 320px" required><button class="btn btn-pri">Request a close-out plan</button></form>
           <span class="muted small">HQ Legal &amp; Compliance approves before the plan starts.</span>
@@ -205,7 +205,7 @@
       <section class="card pad row-flex">
         <div style="flex:1 1 280px"><h2 style="margin:0;font-size:18px">Close-out plan</h2><p class="muted" style="margin:4px 0 0;font-size:14px"><%= closeCount %> of <%= closeTotal %> steps complete.<%= c.phase === 'closed' ? ' The country is closed and this file is read-only.' : ' The annual cycle keeps running until stage 4.' %></p></div>
         <div style="flex:1 1 200px"><div class="bar"><i style="width:<%= closeTotal ? Math.round(closeCount / closeTotal * 100) : 0 %>%"></i></div></div>
-        <% if (canReview && c.phase !== 'closed' && closeTotal && closeCount === closeTotal) { %><form method="post" action="<%= bp %><%= base %>/phase"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="to" value="closed"><button class="btn btn-pri" data-confirm="Mark <%= c.name %> as closed? The file becomes read-only.">Mark country closed</button></form><% } %>
+        <% if (canReview && c.phase !== 'closed' && closeTotal && closeCount === closeTotal) { %><form method="post" action="<%= bp %><%= base %>/phase"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="to" value="closed"><button class="btn btn-pri" data-confirm="<%= c.name %> will be marked closed and its file becomes read-only." data-ok-label="Mark closed">Mark country closed</button></form><% } %>
       </section>
       <% stages.forEach((s) => { %>
         <section class="card overflow" style="<%= s.locked ? 'opacity:.6' : '' %>">

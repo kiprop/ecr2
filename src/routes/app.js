@@ -92,7 +92,7 @@ module.exports = function appRoutes(csrfCheck) {
 
   // ------------------------------------------------------------ home / overview
   r.get('/', async (req, res) => {
-    if (!D.isPreparer(req.user)) return res.redirect('/overview');
+    if (!D.isPreparer(req.user)) return res.redirect(req.query.item ? `/review?item=${encodeURIComponent(req.query.item)}` : '/overview');
     const stats = await countryStats(req);
     const obs = (await obligationsInScope(req, `o.status IN ('todo','returned','submitted')`)).map((o) => D.decorate(o));
     const rank = (o) => (o.status === 'returned' ? -100000 : 0) + (o.days === null ? 99999 : o.days);
@@ -201,6 +201,7 @@ module.exports = function appRoutes(csrfCheck) {
       for (const f of files) await c.q(`INSERT INTO documents (obligation_id, label, filename, mime, size_bytes, storage_path, uploaded_by) VALUES ($1,'Evidence',$2,$3,$4,$5,$6)`, [o.id, f.originalname.slice(0, 200), f.mimetype, f.size, f.path, req.user.id]);
       await c.q(`UPDATE obligations SET status='submitted', payload=$2, submitted_at=now(), submitted_by=$3 WHERE id=$1`, [o.id, JSON.stringify(payload), req.user.id]);
       await D.audit(req.user.id, 'item.submitted', (req.body.note || '').slice(0, 1000) || 'submitted with evidence', o.country_code, o.id, c);
+      await D.notifyInbox(c, await D.reviewers(c), { kind: 'submitted', title: `${(await c.one(`SELECT name FROM countries WHERE code=$1`, [o.country_code])).name} submitted: ${o.title}`, body: `From ${req.user.name}`, link: `/review?item=${o.id}`, code: o.country_code }, req.user.id);
     });
     req.flash('Sent to HQ for review.');
     res.redirect(back);
@@ -221,6 +222,7 @@ module.exports = function appRoutes(csrfCheck) {
     await db.tx(async (c) => {
       await c.q(`UPDATE obligations SET status='accepted', reviewed_at=now(), reviewed_by=$2, review_note=NULL WHERE id=$1`, [o.id, req.user.id]);
       await D.audit(req.user.id, 'item.accepted', (req.body.note || '').slice(0, 1000) || 'accepted', o.country_code, o.id, c);
+      await D.notifyInbox(c, (await D.countryTeam(c, o.country_code)).concat([o.submitted_by]), { kind: 'accepted', title: `Accepted: ${o.title}`, body: `${(await c.one(`SELECT name FROM countries WHERE code=$1`, [o.country_code])).name} · by ${req.user.name}`, link: `/?item=${o.id}`, code: o.country_code }, req.user.id);
       await D.applyAccepted(c, o, req.user.id);
     });
     await D.syncCountry(o.country_code);
@@ -236,6 +238,7 @@ module.exports = function appRoutes(csrfCheck) {
     if (!note) { req.flash('Add a comment so the country knows what to fix.'); return res.redirect(withQuery(back, { item: o.id })); }
     await db.q(`UPDATE obligations SET status='returned', review_note=$2, reviewed_at=now(), reviewed_by=$3, due_date=COALESCE(due_date, CURRENT_DATE + 14) WHERE id=$1`, [o.id, note, req.user.id]);
     await D.audit(req.user.id, 'item.returned', note, o.country_code, o.id);
+    await D.notifyInbox(db, (await D.countryTeam(db, o.country_code)).concat([o.submitted_by]), { kind: 'returned', title: `Returned: ${o.title}`, body: note, link: `/?item=${o.id}`, code: o.country_code }, req.user.id);
     req.flash('Returned. It is back at the top of the country’s list.');
     res.redirect(back);
   });
@@ -271,6 +274,8 @@ module.exports = function appRoutes(csrfCheck) {
     if (left.n) { req.flash('Every item must be done or not applicable first.'); return res.redirect(`/countries/${code}`); }
     await db.q(`UPDATE cycles SET status='signed_off', signed_by=$2, signed_at=now() WHERE id=$1`, [cyc.id, req.user.id]);
     await D.audit(req.user.id, 'cycle.signed_off', `${cyc.label} signed off`, code);
+    const cname = (await db.one(`SELECT name FROM countries WHERE code=$1`, [code])).name;
+    await D.notifyInbox(db, (await D.reviewers(db)).concat(await D.leadersFor(db, code)), { kind: 'signoff', title: `${cname} signed off ${cyc.label}`, body: `By ${req.user.name}`, link: `/countries/${code}`, code }, req.user.id);
     req.flash(`${cyc.label} signed off. HQ has been notified.`);
     res.redirect(`/countries/${code}`);
   });
@@ -284,6 +289,7 @@ module.exports = function appRoutes(csrfCheck) {
         await c.q(`UPDATE obligations SET status='accepted', reviewed_at=now(), reviewed_by=$2 WHERE country_code=$1 AND change_type='close' AND status='submitted'`, [code, req.user.id]);
         await D.startClose(c, code, req.user.id);
       });
+      await D.notifyInbox(db, (await D.countryTeam(db, code)).concat(await D.leadersFor(db, code)), { kind: 'close', title: `Close-out plan started for ${country.name}`, body: `Stage 1 is open · by ${req.user.name}`, link: `/countries/${code}?phase=close`, code }, req.user.id);
       req.flash(`Close-out plan started for ${country.name}. Stage 1 is open.`);
     } else if (canPrepareIn(req, code) && country.close_status === 'none') {
       await db.tx(async (c) => {
@@ -291,6 +297,7 @@ module.exports = function appRoutes(csrfCheck) {
         const ob = await c.one(`INSERT INTO obligations (country_code, area, change_type, title, requirement, status, submitted_at, submitted_by, payload) VALUES ($1,'change','close','Close-out plan requested',$2,'submitted',now(),$3,$4) RETURNING id`,
           [code, `The country office asks HQ to start a close-out plan. Reason: ${(req.body.reason || 'not given').slice(0, 500)}`, req.user.id, JSON.stringify({ reason: req.body.reason || '' })]);
         await D.audit(req.user.id, 'close.requested', req.body.reason || '', code, ob.id, c);
+        await D.notifyInbox(c, await D.reviewers(c), { kind: 'close', title: `${country.name} requests a close-out plan`, body: req.body.reason || '', link: `/countries/${code}?phase=close`, code }, req.user.id);
       });
       req.flash('Close-out requested. HQ approves before the plan starts.');
     } else throw httpError(403, 'Not allowed.');
@@ -382,6 +389,7 @@ module.exports = function appRoutes(csrfCheck) {
         [code, type, def.title, `${summary || 'Change reported by the country office'}. Missing evidence: ${def.evidence.filter((e, i) => !files.some((f) => f.fieldname === 'evidence_' + i)).join(', ') || 'none'}.`, JSON.stringify(payload), req.user.id]);
       for (const f of files) await c.q(`INSERT INTO documents (obligation_id, label, filename, mime, size_bytes, storage_path, uploaded_by) VALUES ($1,$2,$3,$4,$5,$6,$7)`, [ob.id, labelFor(f.fieldname), f.originalname.slice(0, 200), f.mimetype, f.size, f.path, req.user.id]);
       await D.audit(req.user.id, 'change.reported', def.title + (req.body.note ? ` · ${req.body.note.slice(0, 500)}` : ''), code, ob.id, c);
+      await D.notifyInbox(c, await D.reviewers(c), { kind: 'change', title: `${country.name} reported a change: ${def.title}`, body: `From ${req.user.name}`, link: `/review?item=${ob.id}`, code }, req.user.id);
       if (type === 'board') {
         await c.q(`INSERT INTO obligations (country_code, area, title, requirement, due_date, source_type) VALUES ($1,'registration',$2,$3,CURRENT_DATE + 14,'director_notice')`,
           [code, 'Notify the registering authority of the director change', `Board change reported: ${summary}. File the notice of change with the registering authority.`]);
@@ -430,6 +438,20 @@ module.exports = function appRoutes(csrfCheck) {
     });
     lines.push('END:VCALENDAR');
     res.type('text/calendar').send(lines.join('\r\n'));
+  });
+
+  // ------------------------------------------------------------ notifications (the bell)
+  r.get('/notifications', async (req, res) => {
+    const items = await db.q(`SELECT * FROM inbox WHERE user_id=$1 ORDER BY created_at DESC LIMIT 200`, [req.user.id]);
+    res.render('notifications', { title: 'Notifications', nav: '', items });
+  });
+  r.get('/notifications/:id', async (req, res) => {
+    const n = await db.one(`UPDATE inbox SET read_at=COALESCE(read_at, now()) WHERE id=$1 AND user_id=$2 RETURNING link`, [Number(req.params.id) || 0, req.user.id]);
+    res.redirect(n && n.link ? safeReturn(n.link) : '/notifications');
+  });
+  r.post('/notifications/read-all', async (req, res) => {
+    await db.q(`UPDATE inbox SET read_at=now() WHERE user_id=$1 AND read_at IS NULL`, [req.user.id]);
+    res.redirect(safeReturn(req.body.returnTo));
   });
 
   // ------------------------------------------------------------ search

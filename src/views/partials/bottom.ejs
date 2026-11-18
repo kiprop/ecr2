@@ -5,6 +5,13 @@
 <% } %>
 <% if (typeof drawer !== 'undefined' && drawer) { %><%- include('drawer') %><% } %>
 <% if (flash) { %><div class="toast" role="status"><%= flash %></div><% } %>
+<div class="modal" id="confirm-modal" hidden>
+  <div class="modal-card" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-text">
+    <h2 id="confirm-title" style="margin:0;font-size:18px">Please confirm</h2>
+    <p id="confirm-text" class="muted" style="margin:8px 0 18px;font-size:14.5px;line-height:1.5"></p>
+    <div class="row-flex" style="justify-content:flex-end"><button class="btn" type="button" data-cancel>Cancel</button><button class="btn btn-pri" type="button" data-ok>Continue</button></div>
+  </div>
+</div>
 <script src="<%= bp %>/public/js/app.js?v=<%= v %>"></script>
 </body>
 </html>

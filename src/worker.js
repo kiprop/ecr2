@@ -10,6 +10,11 @@ const isoWeek = (d) => { const t = new Date(Date.UTC(d.getFullYear(), d.getMonth
 async function notify(user, kind, key, subject, html, obligationId) {
   const ins = await db.one(`INSERT INTO notifications (user_id, obligation_id, kind, dedupe_key, subject) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (dedupe_key) DO NOTHING RETURNING id`, [user.id, obligationId || null, kind, key, subject]);
   if (!ins) return;
+  if (kind === 'reminder' && obligationId) {
+    const o = await db.one(`SELECT o.title, o.due_date, o.country_code, c.name FROM obligations o JOIN countries c ON c.code=o.country_code WHERE o.id=$1`, [obligationId]);
+    const days = D.daysUntil(o.due_date);
+    await D.notifyInbox(db, [user.id], { kind: days < 0 ? 'overdue' : 'deadline', title: days < 0 ? `Overdue: ${o.title}` : `Due in ${days} days: ${o.title}`, body: `${o.name} · due ${D.fmtDate(o.due_date)}`, link: `/?item=${obligationId}`, code: o.country_code });
+  }
   const status = await graph.sendMail(user.email, subject, html);
   await db.q(`UPDATE notifications SET status=$2 WHERE id=$1`, [ins.id, status]);
 }

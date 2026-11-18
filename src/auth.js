@@ -39,7 +39,9 @@ router.get('/auth/login', async (req, res, next) => {
     const nonce = generators.nonce();
     req.session.oidc = { codeVerifier, state, nonce, returnTo: req.query.returnTo || '' };
     const url = client.authorizationUrl({
-      scope: 'openid profile email', code_challenge: generators.codeChallenge(codeVerifier), code_challenge_method: 'S256', state, nonce, prompt: 'select_account',
+      scope: 'openid profile email', code_challenge: generators.codeChallenge(codeVerifier), code_challenge_method: 'S256', state, nonce,
+      // Silent single sign-on when the browser already has a Microsoft session; the account picker only after an explicit sign-out or "switch account".
+      ...(req.query.switch === '1' ? { prompt: 'select_account' } : {}),
     });
     req.session.save((err) => (err ? next(err) : res.redirect(url)));
   } catch (e) { next(e); }

@@ -35,7 +35,7 @@ app.use(morgan(config.isProd ? 'combined' : 'dev', { skip: (req) => req.url.incl
 const bp = config.basePath;
 // Changes on every start, so browsers fetch fresh CSS/JS after each deploy.
 const assetVersion = Date.now().toString(36);
-app.use((req, res, next) => { Object.assign(res.locals, { bp, v: assetVersion, user: null, scope: [], csrf: '', flash: '', d: domain, authMode: config.auth.mode, drawer: null }); next(); });
+app.use((req, res, next) => { Object.assign(res.locals, { bp, v: assetVersion, unread: 0, bell: [], user: null, scope: [], csrf: '', flash: '', d: domain, authMode: config.auth.mode, drawer: null }); next(); });
 
 // Subpath support: every root-relative redirect gets BASE_PATH, so routes can redirect('/x').
 app.use((req, res, next) => {
@@ -82,6 +82,10 @@ app.use(async (req, res, next) => {
         req.scope = await domain.loadScope(u);
         res.locals.user = u;
         res.locals.scope = req.scope;
+        if (req.method === 'GET') {
+          res.locals.unread = (await db.one(`SELECT count(*)::int n FROM inbox WHERE user_id=$1 AND read_at IS NULL`, [u.id])).n;
+          res.locals.bell = await db.q(`SELECT * FROM inbox WHERE user_id=$1 ORDER BY created_at DESC LIMIT 8`, [u.id]);
+        }
         if (domain.canReview(u)) res.locals.reviewBadge = (await db.one(`SELECT count(*)::int n FROM obligations WHERE status='submitted' AND country_code = ANY($1)`, [req.scope])).n;
       } else { req.session.userId = null; }
     }
@@ -103,7 +107,10 @@ router.use((req, res, next) => (req.is('multipart/form-data') ? next() : csrfChe
 router.use(auth.router);
 router.use((req, res, next) => {
   if (req.user) return next();
-  if (req.method === 'GET' && !req.path.startsWith('/cal/')) return res.redirect('/login' + (req.path !== '/' ? '?returnTo=' + encodeURIComponent(req.originalUrl.slice(bp.length)) : ''));
+  if (req.method === 'GET' && !req.path.startsWith('/cal/')) {
+    if (req.path !== '/' && config.auth.mode === 'entra') return res.redirect('/auth/login?returnTo=' + encodeURIComponent(req.originalUrl.slice(bp.length)));
+    return res.redirect('/login' + (req.path !== '/' ? '?returnTo=' + encodeURIComponent(req.originalUrl.slice(bp.length)) : ''));
+  }
   if (req.path.startsWith('/cal/')) return next();
   return res.status(401).send('Sign in required');
 });

@@ -260,9 +260,27 @@ const CHANGES = {
     followups: ['The registration record updates when HQ accepts', 'The next renewal date recalculates on the calendar'] },
 };
 
+// ---------------------------------------------------------------- in-app notifications (the bell)
+async function countryTeam(c, code) {
+  return (await c.q(`SELECT DISTINCT u.id FROM users u JOIN user_countries uc ON uc.user_id=u.id WHERE u.status='active' AND u.role IN ('director','focal') AND uc.country_code=$1`, [code])).map((r) => r.id);
+}
+async function reviewers(c) {
+  return (await c.q(`SELECT id FROM users WHERE status='active' AND role IN ('admin','reviewer')`)).map((r) => r.id);
+}
+async function leadersFor(c, code) {
+  return (await c.q(`SELECT u.id FROM users u WHERE u.status='active' AND u.role='leader' AND (NOT EXISTS (SELECT 1 FROM user_countries x WHERE x.user_id=u.id) OR EXISTS (SELECT 1 FROM user_countries x WHERE x.user_id=u.id AND x.country_code=$1))`, [code])).map((r) => r.id);
+}
+// Deliver one notification to several people, never to the person who caused it.
+async function notifyInbox(c, userIds, n, actorId) {
+  const ids = [...new Set(userIds)].filter((id) => id && id !== actorId);
+  for (const id of ids) {
+    await c.q(`INSERT INTO inbox (user_id, kind, title, body, link, country_code) VALUES ($1,$2,$3,$4,$5,$6)`, [id, n.kind, n.title, n.body || null, n.link || null, n.code || null]);
+  }
+}
+
 module.exports = {
   ROLES, canReview, isAdmin, isPreparer, loadScope, AREAS, RESTRICTED_AREAS, STATUS, PHASES, CLOSE_STAGES, CHANGES,
   todayISO, addDays, daysUntil, fmtDate, fmtShort, monthName, fmtWhen, decorate, fieldsFor,
   audit, getSettings, DEFAULT_SETTINGS, syncCountry, syncAll, openPlan, openAnnualCycles, currentCycle, fyLabel,
-  applyAccepted, startClose,
+  applyAccepted, startClose, countryTeam, reviewers, leadersFor, notifyInbox,
 };

@@ -1,0 +1,18 @@
+<%- include('partials/top') %>
+<div class="stack" style="gap:18px">
+  <div class="row-flex" style="justify-content:space-between;align-items:flex-end">
+    <div><h1>Notifications</h1><p class="sub">Returns, approvals, new submissions and upcoming deadlines that involve you.</p></div>
+    <% if (items.some((n) => !n.read_at)) { %><form method="post" action="<%= bp %>/notifications/read-all"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="returnTo" value="/notifications"><button class="btn">Mark all as read</button></form><% } %>
+  </div>
+  <section class="card overflow">
+    <% items.forEach((n) => { %>
+      <a class="note <%= n.read_at ? '' : 'unread' %> k-<%= n.kind %>" href="<%= bp %>/notifications/<%= n.id %>" style="padding:14px 18px">
+        <span class="note-dot" aria-hidden="true"></span>
+        <span class="grow"><span class="note-title" style="font-size:14.5px"><%= n.title %></span><% if (n.body) { %><span class="note-body" style="-webkit-line-clamp:4"><%= n.body %></span><% } %></span>
+        <span class="note-when" style="white-space:nowrap;margin-top:0"><%= d.fmtWhen(n.created_at) %></span>
+      </a>
+    <% }) %>
+    <% if (!items.length) { %><div class="empty">Nothing yet. Returns, approvals and deadline alerts will appear here.</div><% } %>
+  </section>
+</div>
+<%- include('partials/bottom') %>

@@ -11,7 +11,7 @@
     <div class="row-flex" style="grid-column:1/-1">
       <button class="btn btn-pri" type="submit">Save</button>
       <a class="btn" href="<%= bp %><%= back %>">Cancel</a>
-      <% if (rec.id !== 'new') { %><button class="btn btn-ret spacer" name="action" value="deactivate" data-confirm="Remove this record from the register? It stays in the history.">Remove from register</button><% } %>
+      <% if (rec.id !== 'new') { %><button class="btn btn-ret spacer" name="action" value="deactivate" data-confirm="The record leaves the register and stops creating deadlines. It stays in the history." data-ok-label="Remove">Remove from register</button><% } %>
     </div>
   </form>
 </div>
