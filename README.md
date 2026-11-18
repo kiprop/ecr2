@@ -38,7 +38,7 @@ ECR 2.0 runs beside v1 (`/compliance`, port 8302) as a separate stack with its o
    ```
 3. **nginx**: paste `deploy/nginx-ecr2.conf` into the 443 server block, then `sudo nginx -t && sudo systemctl reload nginx`.
 4. **Sample data for testers (optional)**: `docker compose exec app node scripts/seed-demo.js` adds eight sample countries with registers and a part-finished cycle. Sample people have `.demo@pedaids.org` addresses and cannot sign in; invite real testers from **Users & access** and give them countries. Before going live with real data, clear it with `docker compose exec app node scripts/seed-demo.js --clear` (keeps templates, settings and real users).
-5. **Reference data (real starting point)**: `docker compose exec app node scripts/seed-reference.js` adds the six country offices from the compliance registry prototype (Lesotho, Malawi, Mozambique, Cameroon, DRC, Côte d'Ivoire) with their entity type, authority, currency, renewal regime and board rules, the Lesotho/Malawi/Côte d'Ivoire wording of the checklists, Malawi-only items, and opens the current annual cycle. It adds no people, registration numbers or dates, and refuses while sample data is loaded. Safe to run again.
+5. **Production starting data**: `docker compose exec app node scripts/seed-reference.js` adds the six country offices (Lesotho, Malawi, Mozambique, Cameroon, DRC, Côte d'Ivoire) with entity type, registering authority and currency, the Lesotho wording of the checklists from Forms 01-03, and opens the current annual cycle. Renewal frequency, board rules, registration numbers, dates and people are entered in the app. It refuses while sample data is loaded and is safe to run again.
 
 Updating: `git pull && docker compose up -d --build`. Migrations run on start.
 
