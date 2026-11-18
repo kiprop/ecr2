@@ -1,0 +1,37 @@
+<%- include('partials/top') %>
+<div class="stack">
+  <div>
+    <h1>Good <%= new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening' %>, <%= user.name.split(' ')[0] %></h1>
+    <p class="sub">Where each country programme stands in its life cycle, and what needs attention.</p>
+  </div>
+  <div class="grid-kpi">
+    <% if (d.canReview(user)) { %><a class="card pad kpi" href="<%= bp %>/review" style="border-color:#A9C3C6"><div class="n" style="color:#0F5A64"><%= kpi.review %></div><div class="l">Waiting for your review →</div></a><% } %>
+    <div class="card pad kpi"><div class="n" style="color:#8E1A2B"><%= kpi.overdue %></div><div class="l">Overdue obligations</div></div>
+    <div class="card pad kpi"><div class="n"><%= kpi.due30 %></div><div class="l">Due in the next 30 days</div></div>
+    <div class="card pad kpi"><div class="n"><%= kpi.signed %><span class="muted" style="font-size:16px"> / <%= kpi.operating %></span></div><div class="l">Annual cycles signed off</div></div>
+  </div>
+  <section class="card overflow">
+    <div class="list-head">
+      <h2 style="margin-right:8px">Countries</h2>
+      <div class="pills"><% [['all','All'],['establish','Establishing'],['operate','Operating'],['close','Closing out']].forEach(([k, l]) => { %><a class="pill <%= phase === k ? 'on' : '' %>" href="<%= bp %>/overview<%= k === 'all' ? '' : '?phase=' + k %>"><%= l %></a><% }) %></div>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Country</th><th>Phase</th><th style="min-width:200px">Progress</th><th>Overdue</th><th>For review</th><th>Next deadline</th><th></th></tr></thead>
+      <tbody>
+        <% rows.forEach((p) => { %>
+          <tr>
+            <td style="font-weight:600"><%= p.name %></td>
+            <td><span class="chip <%= p.phaseCls %>"><%= p.phaseLabel %></span></td>
+            <td><div class="row-flex" style="flex-wrap:nowrap"><div class="bar" style="flex:1;min-width:60px"><i style="width:<%= p.pct %>%"></i></div><span class="mono muted" style="font-size:12px;white-space:nowrap"><%= p.progress %></span></div></td>
+            <td><% if (p.overdue) { %><span class="chip c-red"><%= p.overdue %></span><% } else { %><span class="muted">—</span><% } %></td>
+            <td class="mono"><%= p.review %></td>
+            <td class="small"><%= p.next %></td>
+            <td style="text-align:right"><a class="btn btn-sm" href="<%= bp %>/countries/<%= p.code %>">Open</a></td>
+          </tr>
+        <% }) %>
+        <% if (!rows.length) { %><tr><td colspan="7" class="empty">No countries in this phase.</td></tr><% } %>
+      </tbody>
+    </table></div>
+  </section>
+</div>
+<%- include('partials/bottom') %>

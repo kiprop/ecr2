@@ -1,0 +1,39 @@
+<%- include('partials/top') %>
+<div class="stack" style="gap:18px">
+  <div><h1>Countries</h1><p class="sub">Add a country office in Establish (registering now) or Operate (already registered). Phase changes after that happen from the country file.</p></div>
+  <section class="card overflow"><div class="table-wrap"><table>
+    <thead><tr><th>Code</th><th>Name</th><th>Phase</th><th>Entity type</th><th>Registering authority</th><th>Registered</th><th>Currency</th><th></th></tr></thead>
+    <tbody>
+      <% countries.forEach((c) => { %>
+        <tr>
+          <td class="mono"><%= c.code %></td>
+          <td><input class="input" form="f-<%= c.code %>" name="name" value="<%= c.name %>" style="min-width:130px" aria-label="Name"></td>
+          <td><span class="chip <%= d.PHASES[c.phase][1] %>"><%= d.PHASES[c.phase][0] %></span></td>
+          <td><input class="input" form="f-<%= c.code %>" name="entity_type" value="<%= c.entity_type || '' %>" style="min-width:170px" aria-label="Entity type"></td>
+          <td><input class="input" form="f-<%= c.code %>" name="authority" value="<%= c.authority || '' %>" style="min-width:190px" aria-label="Authority"></td>
+          <td><input class="input" form="f-<%= c.code %>" name="registered_on" value="<%= c.registered_on || '' %>" style="width:120px" aria-label="Registered"></td>
+          <td><input class="input" form="f-<%= c.code %>" name="currency" value="<%= c.currency || '' %>" style="width:80px" aria-label="Currency"></td>
+          <td><form id="f-<%= c.code %>" method="post"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="save"><input type="hidden" name="code" value="<%= c.code %>"><button class="btn btn-sm">Save</button></form></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table></div></section>
+  <form method="post" class="card pad stack-s" style="gap:14px;max-width:760px">
+    <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="add">
+    <h2 style="margin:0;font-size:17px">Add a country</h2>
+    <div class="grid-fields">
+      <label class="field">3-letter code<input class="input" name="code" maxlength="3" placeholder="ZMB" required></label>
+      <label class="field">Name<input class="input" name="name" required></label>
+      <label class="field">Entity type<input class="input" name="entity_type" placeholder="Foreign NGO"></label>
+      <label class="field">Registering authority<input class="input" name="authority"></label>
+      <label class="field">Registered (e.g. Mar 2019)<input class="input" name="registered_on"></label>
+      <label class="field">Currency<input class="input" name="currency" placeholder="ZMW"></label>
+    </div>
+    <div class="stack-s" style="gap:8px">
+      <label class="opt"><input type="radio" name="phase" value="operate" checked><span><b style="display:block;font-size:14px">Already registered (Operate)</b><span class="muted small">Opens the current annual cycle. Add registers from the country file.</span></span></label>
+      <label class="opt"><input type="radio" name="phase" value="establish"><span><b style="display:block;font-size:14px">Registering now (Establish)</b><span class="muted small">Opens the registration checklist.</span></span></label>
+    </div>
+    <div><button class="btn btn-pri">Add country</button></div>
+  </form>
+</div>
+<%- include('partials/bottom') %>

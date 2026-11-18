@@ -1,0 +1,82 @@
+<% const o = drawer.o, back = drawer.closeHref; %>
+<div class="overlay" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+  <a class="scrim" href="<%= bp %><%= back %>" aria-label="Close" tabindex="-1"></a>
+  <aside class="drawer">
+    <div class="drawer-head">
+      <div style="flex:1">
+        <div class="label"><%= o.country_name %> · <%= o.areaLabel %><%= o.seq && (o.area === 'annual' || o.area === 'setup') ? ' · Item ' + o.seq : '' %></div>
+        <h2 id="drawer-title" style="margin:6px 0 8px;font-size:20px"><%= o.title %></h2>
+        <div class="row-flex" style="gap:8px"><span class="chip <%= o.chipCls %>"><%= o.statusLabel %></span><span class="muted small"><%= o.dueText %></span></div>
+      </div>
+      <a class="btn btn-ghost" href="<%= bp %><%= back %>" aria-label="Close" data-close><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></a>
+    </div>
+    <div class="drawer-body">
+      <div><div class="label">What is required</div><p style="margin:6px 0 0;font-size:15px;line-height:1.5"><%= o.requirement || o.title %></p></div>
+
+      <% if (o.status === 'returned' && o.review_note) { %>
+        <div class="notice notice-warn"><div style="font-weight:600;color:#7F420C">Returned by HQ</div><div style="margin-top:3px"><%= o.review_note %></div></div>
+      <% } %>
+
+      <% if (Object.keys(drawer.payload).length && !drawer.canSubmit) { %>
+        <div class="grid-fields" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+          <% const labels = {}; drawer.fields.forEach((f) => labels[f.k] = f.label); if (drawer.changeDef) drawer.changeDef.fields.forEach((f) => labels[f.k] = f.label); %>
+          <% Object.entries(drawer.payload).filter(([k, v]) => v && labels[k] && !/_id$/.test(k)).forEach(([k, v]) => { %>
+            <div><div class="label"><%= labels[k] %></div><div style="margin-top:3px"><%= /^\d{4}-\d{2}-\d{2}$/.test(v) ? d.fmtDate(v) : v %></div></div>
+          <% }) %>
+        </div>
+      <% } %>
+
+      <% if (drawer.docs.length) { %>
+        <div class="stack-s" style="gap:8px">
+          <div class="label">Documents</div>
+          <% drawer.docs.forEach((doc) => { %>
+            <div class="doc"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F5A64" stroke-width="2" aria-hidden="true"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/></svg><span style="flex:1;min-width:0"><a href="<%= bp %>/documents/<%= doc.id %>"><%= doc.filename %></a><span class="muted small" style="display:block"><%= doc.label %> · <%= doc.by_name || '' %> · <%= d.fmtWhen(doc.uploaded_at) %></span></span></div>
+          <% }) %>
+        </div>
+      <% } %>
+
+      <% if (drawer.canSubmit) { %>
+        <form method="post" action="<%= bp %>/items/<%= o.id %>/submit" enctype="multipart/form-data" class="stack-s" style="gap:14px">
+          <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="returnTo" value="<%= back %>">
+          <% drawer.fields.forEach((f) => { %>
+            <label class="field"><%= f.label %>
+              <% if (f.type === 'select') { %><select class="input" name="<%= f.k %>"><% f.options.forEach((op) => { %><option <%= drawer.payload[f.k] === op ? 'selected' : '' %>><%= op %></option><% }) %></select>
+              <% } else { %><input class="input" type="<%= f.type %>" name="<%= f.k %>" value="<%= drawer.payload[f.k] || '' %>"><% } %>
+            </label>
+          <% }) %>
+          <label class="field">Evidence<span class="file-drop"><input type="file" name="file" multiple></span></label>
+          <% if (o.status === 'returned' && drawer.docs.length) { %><label class="check-row"><input type="checkbox" name="keep_docs" value="1">The documents already attached are enough</label><% } %>
+          <label class="field">Note for the reviewer (optional)<textarea class="input" name="note" rows="2"></textarea></label>
+          <div class="row-flex"><button class="btn btn-pri" type="submit">Submit for review</button></div>
+        </form>
+        <% if (drawer.canNA) { %>
+          <form method="post" action="<%= bp %>/items/<%= o.id %>/na" class="row-flex">
+            <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="returnTo" value="<%= back %>">
+            <input class="input" name="note" placeholder="Why it does not apply this year" style="flex:1 1 220px">
+            <button class="btn" type="submit">Not applicable this year</button>
+          </form>
+        <% } %>
+      <% } %>
+
+      <% if (drawer.canReview) { %>
+        <form method="post" action="<%= bp %>/items/<%= o.id %>/accept" class="stack-s notice" style="background:#F6F7F7" id="review-form">
+          <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="returnTo" value="<%= back %>">
+          <label class="field">Comment (required to return)<textarea class="input" name="note" rows="2"></textarea></label>
+          <div class="row-flex"><button class="btn btn-ok" type="submit">Accept</button><button class="btn btn-ret" type="submit" formaction="<%= bp %>/items/<%= o.id %>/return">Return to country</button></div>
+        </form>
+      <% } %>
+
+      <% if (!drawer.canSubmit && !drawer.canReview) { %>
+        <div class="notice notice-info"><%= o.status === 'submitted' ? 'Submitted. HQ will review it, and the outcome shows on the Home page.' : o.status === 'accepted' ? 'Accepted by HQ. Nothing more to do.' : o.status === 'na' ? 'Marked not applicable for this cycle.' : 'The country office has not submitted this yet.' %></div>
+      <% } %>
+
+      <div>
+        <div class="label" style="margin-bottom:6px">Activity</div>
+        <% drawer.events.forEach((e) => { %>
+          <div class="event"><span class="when"><%= d.fmtWhen(e.at) %></span><span><b style="font-weight:600"><%= e.who || 'System' %></b> <span class="muted"><%= e.action.replace(/^item\./, '').replace(/[._]/g, ' ') %><%= e.detail && !/^(submitted with evidence|accepted)$/.test(e.detail) ? ': ' + e.detail : '' %></span></span></div>
+        <% }) %>
+        <% if (!drawer.events.length) { %><div class="muted small">No activity yet.</div><% } %>
+      </div>
+    </div>
+  </aside>
+</div>

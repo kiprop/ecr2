@@ -1,0 +1,9 @@
+<%- include('partials/top') %>
+<% if (!user) { %><div class="login"><div class="login-right" style="border:0;background:var(--bg)"><div class="login-card card" style="padding:28px"><% } %>
+<div class="stack-s">
+  <h1><%= title %></h1>
+  <p class="sub"><%= message %></p>
+  <div><a class="btn" href="<%= bp %>/">Go to the home page</a></div>
+</div>
+<% if (!user) { %></div></div></div><% } %>
+<%- include('partials/bottom') %>

@@ -1,0 +1,15 @@
+<%- include('partials/top') %>
+<div class="stack">
+  <h1>My countries</h1>
+  <div class="grid-cards">
+    <% stats.forEach((c) => { %>
+      <a class="card pad" href="<%= bp %>/countries/<%= c.code %>" style="text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:10px">
+        <div class="row-flex" style="justify-content:space-between"><b style="font-size:17px"><%= c.name %></b><span class="chip <%= c.phaseCls %>"><%= c.phaseLabel %></span></div>
+        <div class="bar"><i style="width:<%= c.pct %>%"></i></div>
+        <div class="muted small"><%= c.progress %> · <%= c.flag %></div>
+        <div class="muted small">Next: <%= c.next %></div>
+      </a>
+    <% }) %>
+  </div>
+</div>
+<%- include('partials/bottom') %>

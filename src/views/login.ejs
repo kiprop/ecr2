@@ -1,0 +1,44 @@
+<%- include('partials/top') %>
+<div class="login">
+  <div class="login-left">
+    <img src="<%= bp %>/public/img/egpaf-logo.png" alt="Elizabeth Glaser Pediatric AIDS Foundation">
+    <div>
+      <h1>EGPAF Compliance Registry</h1>
+      <p class="sub" style="font-size:17px;line-height:1.55;max-width:520px;margin-top:14px">Every country office's registrations, governance, delegated authority and banking obligations, from set-up to close-out, in one place.</p>
+    </div>
+    <div class="stack-s" style="max-width:520px;gap:16px">
+      <div class="feature"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0F5A64" stroke-width="2" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/></svg><div><div style="font-weight:600;font-size:14px">Know what is due, before it is late</div><div class="muted" style="font-size:14px">Deadlines come straight from the registers, with reminders at the lead times HQ sets.</div></div></div>
+      <div class="feature"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0F5A64" stroke-width="2" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z"/></svg><div><div style="font-weight:600;font-size:14px">Restricted by design</div><div class="muted" style="font-size:14px">Invitation only. You see the countries you are responsible for, and nothing else.</div></div></div>
+      <div class="feature"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0F5A64" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5l3 2"/></svg><div><div style="font-weight:600;font-size:14px">A full record</div><div class="muted" style="font-size:14px">Every submission, review and change is kept with who, when and why.</div></div></div>
+    </div>
+  </div>
+  <div class="login-right">
+    <div class="login-card">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center">
+        <img src="<%= bp %>/public/img/egpaf-mark.png" alt="" width="48" height="48" style="border-radius:6px">
+        <div style="font-weight:700;color:#0F5A64;letter-spacing:.04em">ECR 2.0</div>
+        <h2 style="margin:4px 0 0;font-size:24px">Welcome back</h2>
+        <div class="muted" style="font-size:14px">Sign in to the EGPAF Compliance Registry</div>
+      </div>
+      <% if (signedOut) { %><div class="notice notice-ok">You have been signed out.</div><% } %>
+      <% if (error === 'expired') { %><div class="notice notice-warn">Your sign-in took too long. Please try again.</div><% } %>
+      <% if (authMode === 'entra') { %>
+        <a class="btn" style="min-height:48px;font-weight:600" href="<%= bp %>/auth/login<%= typeof returnTo !== 'undefined' && returnTo ? '?returnTo=' + encodeURIComponent(returnTo) : '' %>">
+          <svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#F25022"/><rect x="11" y="1" width="9" height="9" fill="#7FBA00"/><rect x="1" y="11" width="9" height="9" fill="#00A4EF"/><rect x="11" y="11" width="9" height="9" fill="#FFB900"/></svg>
+          EGPAF staff sign-in
+        </a>
+        <div class="muted" style="font-size:13px;text-align:center;line-height:1.5">Use your @pedaids.org account. Access is by invitation from HQ Legal &amp; Compliance.<br>On a shared computer? <a href="https://login.microsoftonline.com/common/oauth2/v2.0/logout">Sign out of Microsoft</a> as well.</div>
+      <% } else { %>
+        <div class="notice notice-warn small">Development mode: Microsoft sign-in is off. Choose an account.</div>
+        <div class="stack-s" style="gap:8px">
+          <% personas.forEach((p) => { %>
+            <form method="post" action="<%= bp %>/auth/mock"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="user_id" value="<%= p.id %>">
+              <button class="opt" type="submit" style="width:100%;align-items:center;text-align:left"><span class="avatar"><%= p.name.split(' ').map((x) => x[0]).join('').slice(0, 2) %></span><span><b style="display:block;font-size:14px"><%= p.name %></b><span class="muted small"><%= d.ROLES[p.role].label %></span></span></button>
+            </form>
+          <% }) %>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+<%- include('partials/bottom') %>

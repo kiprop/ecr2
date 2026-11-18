@@ -1,0 +1,49 @@
+<%- include('partials/top') %>
+<div class="stack">
+  <div>
+    <h1>Good <%= new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening' %>, <%= user.name.split(' ')[0] %></h1>
+    <p class="sub"><%= needs.length %> <%= needs.length === 1 ? 'obligation needs' : 'obligations need' %> you in the next 90 days<%= overdue ? ', including ' + overdue + ' overdue' : '' %>.</p>
+  </div>
+
+  <% signoff.forEach((c) => { %>
+    <div class="card pad row-flex" style="border-color:#A9C3C6;background:#F5FAFA">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F5A64" stroke-width="2" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>
+      <div style="flex:1 1 260px"><div style="font-weight:600"><%= c.cycle.label %> for <%= c.name %> is ready for your sign-off</div><div class="muted small">Every item is done or not applicable.</div></div>
+      <a class="btn btn-pri" href="<%= bp %>/countries/<%= c.code %>?tab=cycle#signoff">Review and sign off</a>
+    </div>
+  <% }) %>
+
+  <div class="grid-cards">
+    <% stats.forEach((c) => { %>
+      <a class="card pad" href="<%= bp %>/countries/<%= c.code %>" style="text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:10px">
+        <div class="row-flex" style="justify-content:space-between"><b style="font-size:16px"><%= c.name %></b><span class="chip <%= c.phaseCls %>"><%= c.phaseLabel %></span></div>
+        <div class="bar"><i style="width:<%= c.pct %>%"></i></div>
+        <div class="row-flex muted small" style="justify-content:space-between"><span><%= c.progress %></span><span><%= c.flag %></span></div>
+      </a>
+    <% }) %>
+  </div>
+
+  <div class="split">
+    <section class="card overflow main-col">
+      <div class="list-head"><h2>Needs you</h2><span class="chip c-neutral"><%= needs.length %></span><span class="muted small spacer">Returned and overdue first, then by due date</span></div>
+      <% needs.forEach((o) => { %><%- include('partials/row', { o, showCountry: multi }) %><% }) %>
+      <% if (!needs.length) { %><div class="empty">Nothing due in the next 90 days.</div><% } %>
+      <div class="foot"><%= later %> more fall due after 90 days. <a href="<%= bp %>/calendar">Open the calendar</a></div>
+    </section>
+    <div class="side-col">
+      <section class="card overflow">
+        <div class="list-head" style="padding-bottom:8px"><h2>Waiting on HQ</h2></div>
+        <% waiting.slice(0, 8).forEach((o) => { %>
+          <a class="row" href="<%= bp %><%= withItem(o.id) %>" style="padding:10px 18px;min-height:48px"><span class="grow" style="font-size:14px"><%= o.title %><span class="meta"><%= o.country_name %></span></span><span class="chip c-blue">In review</span></a>
+        <% }) %>
+        <% if (!waiting.length) { %><div class="muted" style="padding:4px 18px 16px;font-size:14px">Nothing with HQ right now.</div><% } %>
+      </section>
+      <section class="card pad stack-s" style="gap:10px">
+        <h2 style="margin:0;font-size:17px">Something changed?</h2>
+        <p class="muted" style="margin:0;font-size:13.5px">Tell us once. The register, follow-up tasks and reviewers update from it.</p>
+        <% Object.entries(changes).forEach(([k, c]) => { %><a class="btn" style="justify-content:flex-start" href="<%= bp %>/changes/new?type=<%= k %>"><%= c.short %></a><% }) %>
+      </section>
+    </div>
+  </div>
+</div>
+<%- include('partials/bottom') %>

@@ -1,0 +1,20 @@
+<%- include('partials/top') %>
+<div class="stack" style="gap:18px">
+  <div><h1>Review queue</h1><p class="sub">Country submissions, oldest first. Accept, or return with what needs fixing.</p></div>
+  <div class="pills">
+    <a class="pill <%= country === 'all' ? 'on' : '' %>" href="<%= bp %>/review">All (<%= total %>)</a>
+    <% Object.entries(counts).forEach(([k, n]) => { %><a class="pill <%= country === k ? 'on' : '' %>" href="<%= bp %>/review?country=<%= k %>"><%= names[k] %> (<%= n %>)</a><% }) %>
+  </div>
+  <section class="card overflow">
+    <% items.forEach((o) => { %>
+      <a class="row" href="<%= bp %><%= withItem(o.id) %>">
+        <span class="chip c-teal fixed"><%= o.country_name %></span>
+        <span class="grow"><span class="title"><%= o.title %></span><span class="meta"><%= o.areaLabel %> · submitted <%= d.fmtWhen(o.submitted_at) %></span></span>
+        <span class="muted small" style="white-space:nowrap"><%= o.dueShort %></span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A939C" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+      </a>
+    <% }) %>
+    <% if (!items.length) { %><div class="empty">The queue is clear.</div><% } %>
+  </section>
+</div>
+<%- include('partials/bottom') %>

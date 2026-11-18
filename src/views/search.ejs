@@ -1,0 +1,9 @@
+<%- include('partials/top') %>
+<div class="stack" style="gap:18px">
+  <div><h1>Search</h1><p class="sub"><%= q.length < 2 ? 'Type at least two letters.' : 'Results for “' + q + '”' %></p></div>
+  <% if (countries.length) { %><section class="card overflow"><div class="label" style="padding:13px 18px">Countries</div><% countries.forEach((c) => { %><a class="row" href="<%= bp %>/countries/<%= c.code %>"><span class="grow title"><%= c.name %></span><span class="chip <%= d.PHASES[c.phase][1] %>"><%= d.PHASES[c.phase][0] %></span></a><% }) %></section><% } %>
+  <% if (items.length) { %><section class="card overflow"><div class="label" style="padding:13px 18px">Obligations</div><% items.forEach((o) => { %><%- include('partials/row', { o, showCountry: true }) %><% }) %></section><% } %>
+  <% if (people.length) { %><section class="card overflow"><div class="label" style="padding:13px 18px">People</div><% people.forEach((p) => { %><a class="row" href="<%= bp %>/admin/users/<%= p.id %>"><span class="grow"><span class="title"><%= p.name %></span><span class="meta"><%= p.email %></span></span><span class="muted small"><%= d.ROLES[p.role].label %></span></a><% }) %></section><% } %>
+  <% if (q.length >= 2 && !countries.length && !items.length && !people.length) { %><div class="card empty">Nothing found.</div><% } %>
+</div>
+<%- include('partials/bottom') %>

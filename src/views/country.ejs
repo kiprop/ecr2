@@ -1,0 +1,226 @@
+<%- include('partials/top') %>
+<%
+  const c = country, code = c.code;
+  const base = '/countries/' + code;
+  const order = ['establish', 'operate', 'close'];
+  const curIdx = c.phase === 'closed' ? 3 : order.indexOf(c.phase);
+  const phaseSub = {
+    establish: c.phase === 'establish' ? (setup.filter((o) => o.status === 'accepted').length + ' of ' + setup.length + ' done') : 'Complete' + (c.registered_on ? ' · ' + c.registered_on : ''),
+    operate: c.phase === 'establish' ? 'Opens after registration' : (c.phase === 'operate' ? 'Current' + (cycle ? ' · ' + cycle.label : '') : 'Winding down'),
+    close: c.close_status === 'running' ? closeCount + ' of ' + closeTotal + ' steps' : c.close_status === 'requested' ? 'Requested' : c.phase === 'closed' ? 'Closed' : 'Not started'
+  };
+  const tabs = [['cycle', 'Annual cycle', 'annual'], ['reg', 'Registration', 'registration'], ['board', 'Board', 'board'], ['poa', 'Powers of attorney', 'poa'], ['bank', 'Bank accounts', 'banking'], ['history', 'History', null]];
+  const lock = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" role="img" aria-label="Restricted"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+  const yes = (v) => v ? 'Yes' : 'No';
+  const fd = (v) => v ? d.fmtDate(v) : '—';
+%>
+<div class="stack" style="gap:20px">
+  <div class="row-flex" style="justify-content:space-between;align-items:flex-end">
+    <div>
+      <% if (scopeCountries.length > 1) { %><a class="small" href="<%= bp %><%= d.isPreparer(user) ? '/countries' : '/overview' %>">← <%= d.isPreparer(user) ? 'My countries' : 'Overview' %></a><% } %>
+      <h1 style="margin-top:4px"><%= c.name %></h1>
+      <p class="sub" style="font-size:14px"><%= [c.entity_type, c.authority, c.phase === 'establish' ? 'Registration in progress' : (c.registered_on ? 'Registered ' + c.registered_on : null)].filter(Boolean).join(' · ') %></p>
+    </div>
+    <div class="row-flex">
+      <% if (scopeCountries.length > 1) { %>
+        <form method="get" action="" data-autosubmit><label for="sw" style="position:absolute;left:-9999px">Switch country</label>
+          <select id="sw" class="input" style="width:190px" data-goto="<%= bp %>/countries/"><% scopeCountries.forEach((x) => { %><option value="<%= x.code %>" <%= x.code === code ? 'selected' : '' %>><%= x.name %></option><% }) %></select>
+        </form>
+      <% } %>
+      <% if (canPrepare && c.phase !== 'closed') { %><a class="btn btn-pri" href="<%= bp %>/changes/new?country=<%= code %>">Report a change</a><% } %>
+    </div>
+  </div>
+
+  <div class="phases">
+    <% order.forEach((p, i) => { %>
+      <a class="phase <%= view === p ? 'on' : '' %>" href="<%= bp %><%= base %>?phase=<%= p %>">
+        <span class="dot <%= i < curIdx ? 'dot-done' : i === curIdx ? 'dot-now' : 'dot-later' %>"><% if (i < curIdx) { %><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg><% } else { %><%= i + 1 %><% } %></span>
+        <span><b><%= ['Establish', 'Operate', 'Close out'][i] %></b><span class="s"><%= phaseSub[p] %></span></span>
+      </a>
+    <% }) %>
+  </div>
+
+  <!-- ============ ESTABLISH ============ -->
+  <% if (view === 'establish') { %>
+    <section class="card pad row-flex" style="gap:20px">
+      <div style="flex:1 1 300px">
+        <h2 style="margin:0;font-size:18px">Registration requirements</h2>
+        <p class="muted" style="margin:4px 0 0;font-size:14px"><%= c.phase === 'establish' ? 'Work through these to register the entity. The annual cycle and registers open once registration is complete.' : 'Completed when the entity registered. Kept as the record of how it was set up.' %></p>
+      </div>
+      <% if (c.phase === 'establish' && canReview && setupDone) { %>
+        <form method="post" action="<%= bp %><%= base %>/phase"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="to" value="operate"><button class="btn btn-pri">Registration complete: move to Operate</button></form>
+      <% } %>
+    </section>
+    <section class="card overflow">
+      <% if (setup.length) { setup.forEach((o) => { %><%- include('partials/row', { o, lead: 'seq' }) %><% }) } else { setupTpl.forEach((t) => { %>
+        <div class="row"><span class="mono muted small" style="width:22px"><%= t.seq %></span><span class="grow"><%= t.text %></span><span class="chip c-green fixed">Done</span></div>
+      <% }) } %>
+    </section>
+  <% } %>
+
+  <!-- ============ OPERATE ============ -->
+  <% if (view === 'operate') { %>
+    <% if (c.phase === 'establish') { %>
+      <div class="card empty"><b style="color:var(--ink)">Operations open once registration is complete.</b><br>When HQ confirms registration, the first annual cycle and the registers (board, powers of attorney, bank accounts) open here.</div>
+    <% } else { %>
+    <nav class="tabs" aria-label="Sections">
+      <% tabs.forEach(([k, l, area]) => { const n = area ? overdueByArea(area) : 0; %>
+        <a class="tab <%= tab === k ? 'on' : '' %>" href="<%= bp %><%= base %>?tab=<%= k %>"><%= l %><% if (n) { %><span class="chip c-red"><%= n %></span><% } %><% if (k === 'poa' || k === 'bank') { %><%- lock %><% } %></a>
+      <% }) %>
+    </nav>
+
+    <% if (tab === 'cycle') { %>
+      <% if (!cycle) { %><div class="card empty">No annual cycle is open yet. An administrator opens it from Settings.</div><% } else { %>
+      <section class="card pad row-flex" style="gap:24px">
+        <div style="flex:1 1 280px">
+          <h2 style="margin:0;font-size:18px"><%= cycle.label %> annual compliance</h2>
+          <p class="muted" style="margin:4px 0 10px;font-size:14px"><%= annual.length %> requirements from the standard template, worded for <%= c.name %>. Opened <%= d.fmtDate(cycle.opened_on) %>.</p>
+          <div class="bar"><i style="width:<%= annual.length ? Math.round(done / annual.length * 100) : 0 %>%"></i></div>
+        </div>
+        <div class="row-flex" style="gap:24px">
+          <div class="kpi"><div class="n" style="font-size:24px"><%= done %></div><div class="l">Done / N/A</div></div>
+          <div class="kpi"><div class="n" style="font-size:24px"><%= waiting %></div><div class="l">With HQ</div></div>
+          <div class="kpi"><div class="n" style="font-size:24px"><%= annual.length - done - waiting %></div><div class="l">To do</div></div>
+        </div>
+      </section>
+      <section class="card overflow"><% annual.forEach((o) => { %><%- include('partials/row', { o, lead: 'seq' }) %><% }) %></section>
+      <section class="card pad row-flex" id="signoff" style="background:#FAFBFB">
+        <div style="flex:1 1 300px"><div style="font-weight:600">Country Director sign-off</div>
+          <div class="muted" style="font-size:14px;margin-top:2px"><%= cycle.status === 'signed_off' ? 'Signed off ' + d.fmtDate(new Date(cycle.signed_at).toISOString().slice(0, 10)) + '. The cycle is closed.' : allDone ? (isDirector ? 'Everything is done. Confirm the whole cycle in one step.' : 'Ready. Waiting for the Country Director to sign off.') : 'Unlocks when every item is done or not applicable (' + (annual.length - done) + ' to go).' %></div></div>
+        <% if (cycle.status === 'signed_off') { %><span class="chip c-green">Signed off</span>
+        <% } else if (isDirector) { %><form method="post" action="<%= bp %><%= base %>/signoff"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-pri" <%= allDone ? '' : 'disabled' %>>Sign off <%= cycle.label %></button></form><% } %>
+      </section>
+      <% } %>
+    <% } %>
+
+    <% if (tab === 'reg') { const g = registration ? registration.data : null; %>
+      <section class="card pad">
+        <div class="row-flex" style="justify-content:space-between"><h2 style="margin:0;font-size:18px">Certificate of Registration</h2>
+          <% if (canEditRegisters) { %><a class="btn btn-sm" href="<%= bp %><%= base %>/registers/registration/<%= registration ? registration.id : 'new' %>"><%= registration ? 'Edit' : 'Add details' %></a><% } %></div>
+        <% if (g) { %>
+        <div class="grid-fields" style="margin-top:16px">
+          <div><div class="label">Category</div><div><%= g.category || c.entity_type || '—' %></div></div>
+          <div><div class="label">Authority</div><div><%= g.authority || c.authority || '—' %></div></div>
+          <div><div class="label">Registration no.</div><div class="mono"><%= g.reg_number || '—' %></div></div>
+          <div><div class="label">Registered</div><div><%= fd(g.registered_on) %></div></div>
+          <div><div class="label">Expires</div><div><%= fd(g.expires_on) %></div></div>
+          <div><div class="label">Renewal</div><div><%= g.renewal_frequency || '—' %></div></div>
+          <div><div class="label">Last legal review</div><div><%= fd(g.last_legal_review) %></div></div>
+          <div><div class="label">Tax status</div><div><%= g.tax_status || '—' %></div></div>
+        </div>
+        <% if (g.recent_changes) { %><div class="notice notice-info" style="margin-top:14px"><b>Recent legal or regulatory changes:</b> <%= g.recent_changes %></div><% } %>
+        <% } else { %><p class="muted">No registration details recorded yet.</p><% } %>
+      </section>
+      <section class="card overflow"><div class="label" style="padding:13px 18px">Obligations</div><% regItems.forEach((o) => { %><%- include('partials/row', { o, lead: 'none' }) %><% }) %><% if (!regItems.length) { %><div class="empty">Nothing open.</div><% } %></section>
+    <% } %>
+
+    <% if (tab === 'board') { %>
+      <section class="card overflow">
+        <div class="list-head" style="justify-content:space-between"><div><h2 style="font-size:18px">Board of directors</h2><p class="muted" style="margin:4px 0 0;font-size:14px"><%= board.length %> active members</p></div>
+          <div class="row-flex"><% if (canPrepare) { %><a class="btn" href="<%= bp %>/changes/new?type=board&country=<%= code %>">Member joins or leaves</a><% } %><% if (canEditRegisters) { %><a class="btn btn-sm" href="<%= bp %><%= base %>/registers/board/new">Add record</a><% } %></div></div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Name</th><th>Role</th><th>Appointed</th><th>Term ends</th><th>Local / independent</th><th>COI</th><th>Vetting</th><% if (canEditRegisters) { %><th></th><% } %></tr></thead>
+          <tbody><% board.forEach((b) => { const x = b.data; %><tr>
+            <td style="font-weight:500"><%= x.name %></td><td><%= x.position || '—' %></td><td><%= fd(x.appointed_on) %></td><td><%= fd(x.term_ends) %></td>
+            <td class="small"><%= [x.local_national ? 'Local national' : null, x.independent ? 'Independent' : null].filter(Boolean).join(', ') || '—' %></td>
+            <td><span class="chip <%= x.coi_on_file ? 'c-green' : 'c-red' %>"><%= x.coi_on_file ? 'On file' : 'Missing' %></span></td>
+            <td><span class="chip <%= x.vetting_done ? 'c-green' : 'c-orange' %>"><%= x.vetting_done ? 'Done' : 'Pending' %></span></td>
+            <% if (canEditRegisters) { %><td style="text-align:right"><a class="btn btn-sm" href="<%= bp %><%= base %>/registers/board/<%= b.id %>">Edit</a></td><% } %>
+          </tr><% }) %>
+          <% if (!board.length) { %><tr><td colspan="8" class="empty">No board members recorded.</td></tr><% } %></tbody>
+        </table></div>
+      </section>
+      <section class="card overflow"><div class="label" style="padding:13px 18px">Obligations</div><% boardItems.forEach((o) => { %><%- include('partials/row', { o, lead: 'none' }) %><% }) %><% if (!boardItems.length) { %><div class="empty">Nothing open.</div><% } %></section>
+    <% } %>
+
+    <% if (tab === 'poa') { %>
+      <div class="muted small row-flex" style="gap:8px"><%- lock %>Restricted. Visible only to HQ Legal &amp; Compliance, leadership and this country's team.</div>
+      <section class="card overflow">
+        <div class="list-head" style="justify-content:space-between"><h2 style="font-size:18px">Powers of attorney</h2>
+          <div class="row-flex"><% if (canPrepare) { %><a class="btn" href="<%= bp %>/changes/new?type=poa&country=<%= code %>">Grant or renew a POA</a><% } %><% if (canEditRegisters) { %><a class="btn btn-sm" href="<%= bp %><%= base %>/registers/poa/new">Add record</a><% } %></div></div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Holder</th><th>Position</th><th>Scope</th><th>Effective</th><th>Expires</th><th>Notarised</th><th>Registered locally</th><% if (canEditRegisters) { %><th></th><% } %></tr></thead>
+          <tbody><% poas.forEach((p) => { const x = p.data, dd = d.daysUntil(x.expires_on); %><tr>
+            <td style="font-weight:500"><%= x.holder %></td><td><%= x.position || '—' %></td><td class="small"><%= x.scope || '—' %></td><td><%= fd(x.effective_on) %></td>
+            <td><%= fd(x.expires_on) %> <% if (dd !== null && dd <= 60) { %><span class="chip <%= dd < 0 ? 'c-red' : 'c-orange' %>"><%= dd < 0 ? 'Expired' : dd + ' days' %></span><% } %></td>
+            <td><%= yes(x.notarised) %></td><td><%= yes(x.registered_locally) %></td>
+            <% if (canEditRegisters) { %><td style="text-align:right"><a class="btn btn-sm" href="<%= bp %><%= base %>/registers/poa/<%= p.id %>">Edit</a></td><% } %>
+          </tr><% }) %>
+          <% if (!poas.length) { %><tr><td colspan="8" class="empty">No powers of attorney recorded.</td></tr><% } %></tbody>
+        </table></div>
+      </section>
+      <section class="card overflow"><div class="label" style="padding:13px 18px">Obligations</div><% poaItems.forEach((o) => { %><%- include('partials/row', { o, lead: 'none' }) %><% }) %><% if (!poaItems.length) { %><div class="empty">Nothing open.</div><% } %></section>
+    <% } %>
+
+    <% if (tab === 'bank') { %>
+      <div class="muted small row-flex" style="gap:8px"><%- lock %>Restricted. Account numbers are masked, and document downloads are logged.</div>
+      <% if (canEditRegisters) { %><div><a class="btn btn-sm" href="<%= bp %><%= base %>/registers/bank/new">Add bank account</a></div><% } %>
+      <div class="grid-kpi" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+        <% banks.forEach((a) => { const x = a.data, due = x.last_confirmed_on ? d.daysUntil(d.addDays(x.last_confirmed_on, 365)) : -1; %>
+          <section class="card pad stack-s">
+            <div class="row-flex" style="justify-content:space-between;align-items:flex-start"><div><b><%= x.bank %></b><div class="muted small"><%= x.account_type || 'Account' %> · <%= x.currency || '' %> · <span class="mono">•••• <%= x.last4 || '????' %></span></div></div>
+              <span class="chip <%= due < 0 ? 'c-red' : 'c-green' %>"><%= due < 0 ? 'Confirmation overdue' : 'Compliant' %></span></div>
+            <div class="grid-fields" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px;font-size:14px">
+              <div><div class="label">Signatories</div><%= x.signatories || '—' %><% if (x.rule) { %> <span class="muted">(<%= x.rule %>)</span><% } %></div>
+              <div><div class="label">Dual signature above</div><%= x.threshold || '—' %></div>
+              <div><div class="label">Last bank confirmation</div><%= fd(x.last_confirmed_on) %></div>
+              <div><div class="label">Mandate / KYC</div><%= x.mandate_on_file ? 'Mandate' : 'No mandate' %> · <%= x.kyc_on_file ? 'KYC' : 'No KYC' %></div>
+            </div>
+            <div class="row-flex"><% if (canPrepare) { %><a class="btn btn-sm" href="<%= bp %>/changes/new?type=signatory&country=<%= code %>">Change signatories</a><% } %><% if (canEditRegisters) { %><a class="btn btn-sm" href="<%= bp %><%= base %>/registers/bank/<%= a.id %>">Edit</a><% } %></div>
+          </section>
+        <% }) %>
+      </div>
+      <% if (!banks.length) { %><div class="card empty">No bank accounts recorded.</div><% } %>
+      <section class="card overflow"><div class="label" style="padding:13px 18px">Obligations</div><% bankItems.forEach((o) => { %><%- include('partials/row', { o, lead: 'none' }) %><% }) %><% if (!bankItems.length) { %><div class="empty">Nothing open.</div><% } %></section>
+    <% } %>
+
+    <% if (tab === 'history') { %>
+      <section class="card overflow">
+        <div class="list-head" style="justify-content:space-between"><div><h2 style="font-size:18px">History</h2><p class="muted" style="margin:4px 0 0;font-size:14px">Every submission, review, register change and document view for <%= c.name %>, newest first. Nothing is overwritten.</p></div><a class="btn" href="<%= bp %><%= base %>/history.csv">Export CSV</a></div>
+        <% events.forEach((e) => { %>
+          <div class="row" style="align-items:flex-start"><span class="mono muted" style="width:70px;font-size:12.5px;flex:none;padding-top:2px"><%= d.fmtWhen(e.at) %></span><span class="grow"><b style="font-weight:600"><%= e.who || 'System' %></b> <span class="muted"><%= e.action.replace(/[._]/g, ' ') %><%= e.detail ? ': ' + e.detail : '' %></span><% if (e.title) { %><span class="meta" style="color:var(--ink)"><%= e.title %></span><% } %></span></div>
+        <% }) %>
+        <% if (!events.length) { %><div class="empty">No activity yet.</div><% } %>
+      </section>
+    <% } %>
+    <% } %>
+  <% } %>
+
+  <!-- ============ CLOSE OUT ============ -->
+  <% if (view === 'close') { %>
+    <% if (c.close_status !== 'running' && c.phase !== 'closed') { %>
+      <section class="card pad stack-s" style="gap:16px">
+        <h2 style="margin:0;font-size:20px">No close-out under way</h2>
+        <p class="muted" style="margin:0;font-size:15px;max-width:720px">When a programme ends, close-out runs as a plan in four stages. Each stage unlocks only when the one before it is complete, so the entity is never deregistered before debts are settled and assets distributed.</p>
+        <div class="grid-kpi"><% d.CLOSE_STAGES.forEach((s) => { %><div style="border:1px solid var(--line);border-radius:10px;padding:14px"><div class="label">Stage <%= s.n %></div><b style="display:block;margin-top:3px"><%= s.name %></b></div><% }) %></div>
+        <% if (c.close_status === 'requested') { %><span class="chip c-blue" style="align-self:flex-start">Close-out requested · waiting for HQ approval</span><% } %>
+        <% if (canReview) { %>
+          <form method="post" action="<%= bp %><%= base %>/close" class="row-flex"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-pri" data-confirm="Start the close-out plan for <%= c.name %>? The country moves to the Close out phase."><%= c.close_status === 'requested' ? 'Approve and start the close-out plan' : 'Start a close-out plan' %></button><span class="muted small">The annual cycle keeps running until stage 4.</span></form>
+        <% } else if (canPrepare && c.close_status === 'none') { %>
+          <form method="post" action="<%= bp %><%= base %>/close" class="row-flex"><input type="hidden" name="_csrf" value="<%= csrf %>"><input class="input" name="reason" placeholder="Why the programme is closing (award end, transition...)" style="flex:1 1 320px" required><button class="btn btn-pri">Request a close-out plan</button></form>
+          <span class="muted small">HQ Legal &amp; Compliance approves before the plan starts.</span>
+        <% } %>
+      </section>
+    <% } else { %>
+      <section class="card pad row-flex">
+        <div style="flex:1 1 280px"><h2 style="margin:0;font-size:18px">Close-out plan</h2><p class="muted" style="margin:4px 0 0;font-size:14px"><%= closeCount %> of <%= closeTotal %> steps complete.<%= c.phase === 'closed' ? ' The country is closed and this file is read-only.' : ' The annual cycle keeps running until stage 4.' %></p></div>
+        <div style="flex:1 1 200px"><div class="bar"><i style="width:<%= closeTotal ? Math.round(closeCount / closeTotal * 100) : 0 %>%"></i></div></div>
+        <% if (canReview && c.phase !== 'closed' && closeTotal && closeCount === closeTotal) { %><form method="post" action="<%= bp %><%= base %>/phase"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="to" value="closed"><button class="btn btn-pri" data-confirm="Mark <%= c.name %> as closed? The file becomes read-only.">Mark country closed</button></form><% } %>
+      </section>
+      <% stages.forEach((s) => { %>
+        <section class="card overflow" style="<%= s.locked ? 'opacity:.6' : '' %>">
+          <div class="list-head"><span class="label">Stage <%= s.n %></span><b><%= s.name %></b><span class="chip spacer <%= s.locked ? 'c-muted' : s.allDone ? 'c-green' : 'c-blue' %>"><%= s.locked ? 'Locked' : s.allDone ? 'Complete' : 'In progress' %></span></div>
+          <% s.steps.forEach((o) => { const can = (canPrepare || canReview) && !s.locked && c.phase !== 'closed'; %>
+            <form method="post" action="<%= bp %>/items/<%= o.id %>/toggle" class="row" style="padding:8px 18px">
+              <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="returnTo" value="<%= base %>?phase=close">
+              <button class="btn btn-sm <%= o.status === 'accepted' ? 'btn-ok' : '' %>" <%= can ? '' : 'disabled' %> aria-label="<%= o.status === 'accepted' ? 'Mark not done' : 'Mark done' %>" style="width:34px;padding:0"><% if (o.status === 'accepted') { %><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg><% } %></button>
+              <span class="mono muted small" style="width:22px"><%= o.seq %></span><a class="grow" href="<%= bp %><%= withItem(o.id) %>" style="color:inherit;text-decoration:none"><%= o.title %></a>
+            </form>
+          <% }) %>
+          <% if (s.gate) { %><div class="foot" style="background:#FAFBFB"><%= s.gate %></div><% } %>
+        </section>
+      <% }) %>
+    <% } %>
+  <% } %>
+</div>
+<%- include('partials/bottom') %>

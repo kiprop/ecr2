@@ -1,0 +1,33 @@
+<%- include('partials/top') %>
+<div class="stack" style="gap:18px">
+  <div class="row-flex" style="justify-content:space-between;align-items:flex-end">
+    <div><h1>Users &amp; access</h1><p class="sub">Invitation only. People sign in with their EGPAF Microsoft account; their role and countries decide what they see.</p></div>
+    <a class="btn btn-pri" href="<%= bp %>/admin/users/new">Invite a person</a>
+  </div>
+  <div class="pills">
+    <% [['all', 'Everyone'], ['admin', 'Administrators'], ['reviewer', 'HQ reviewers'], ['leader', 'Leadership'], ['director', 'Country Directors'], ['focal', 'Focal points']].forEach(([k, l]) => { %>
+      <a class="pill <%= role === k ? 'on' : '' %>" href="<%= bp %>/admin/users<%= k === 'all' ? '' : '?role=' + k %>"><%= l %> · <%= counts[k] || 0 %></a>
+    <% }) %>
+  </div>
+  <section class="card overflow"><div class="table-wrap"><table>
+    <thead><tr><th>Person</th><th>Role</th><th>Countries</th><th>Last sign-in</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      <% users.forEach((u) => { const st = { active: ['Active', 'c-green'], invited: ['Invited', 'c-blue'], inactive: ['Deactivated', 'c-muted'] }[u.status]; %>
+        <tr>
+          <td><b style="font-weight:600"><%= u.name %></b><div class="muted small"><%= u.email %><%= u.title ? ' · ' + u.title : '' %></div></td>
+          <td><%= d.ROLES[u.role].label %></td>
+          <td class="small"><%= d.ROLES[u.role].all || !u.country_names.length ? 'All countries' : u.country_names.join(', ') %></td>
+          <td class="muted small"><%= u.last_login_at ? d.fmtWhen(u.last_login_at) : 'Never' %></td>
+          <td><span class="chip <%= st[1] %>"><%= st[0] %></span></td>
+          <td style="text-align:right"><a class="btn btn-sm" href="<%= bp %>/admin/users/<%= u.id %>">Edit</a></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table></div></section>
+  <section class="card overflow">
+    <div class="list-head"><h2>Access changes</h2></div>
+    <% log.forEach((e) => { %><div class="row"><span class="mono muted" style="width:70px;font-size:12.5px"><%= d.fmtWhen(e.at) %></span><span class="grow small"><b><%= e.who || 'System' %></b> <span class="muted"><%= e.detail %></span></span></div><% }) %>
+    <% if (!log.length) { %><div class="empty">No access changes yet.</div><% } %>
+  </section>
+</div>
+<%- include('partials/bottom') %>

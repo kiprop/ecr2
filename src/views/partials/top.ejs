@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><%= typeof title !== 'undefined' ? title + ' · ' : '' %>ECR 2.0 · EGPAF</title>
+<link rel="icon" href="<%= bp %>/public/img/egpaf-mark.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="<%= bp %>/public/css/app.css">
+</head>
+<body>
+<% if (user) {
+  const I = {
+    home: 'M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
+    grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+    inbox: 'M4 13l2-8h12l2 8M4 13v6h16v-6M4 13h5l1 2h4l1-2h5',
+    cal: 'M4 6h16v14H4zM4 10h16M9 3v4M15 3v4',
+    globe: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18',
+    users: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21c0-4 3-6 7-6s7 2 7 6M17 11a3 3 0 1 0 0-6M22 20c0-3-2-5-5-5',
+    list: 'M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01',
+    flag: 'M5 21V4M5 4h11l-2 4 2 4H5',
+    gear: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z',
+    out: 'M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10',
+    plus: 'M12 5v14M5 12h14'
+  };
+  const role = user.role, R = d.ROLES[role];
+  const items = [];
+  if (d.isPreparer(user)) {
+    items.push(['home', '/', 'Home', I.home]);
+    if (scope.length > 1) items.push(['countries', '/countries', 'My countries', I.globe]);
+    else if (scope.length === 1) items.push(['country', '/countries/' + scope[0], 'Country file', I.globe]);
+  } else {
+    items.push(['overview', '/overview', 'Overview', I.grid]);
+    if (d.canReview(user)) items.push(['review', '/review', 'Review queue', I.inbox]);
+  }
+  items.push(['calendar', '/calendar', 'Calendar', I.cal]);
+  const admin = [['users', '/admin/users', 'Users & access', I.users], ['templates', '/admin/templates', 'Templates', I.list], ['admin-countries', '/admin/countries', 'Countries', I.flag], ['settings', '/admin/settings', 'Settings', I.gear]];
+  const initials = user.name.split(' ').map((x) => x[0]).join('').slice(0, 2);
+  const scopeText = R.all || scope.length > 6 ? 'All countries' : scope.length + (scope.length === 1 ? ' country' : ' countries');
+  const cur = typeof nav !== 'undefined' ? nav : '';
+%>
+<div class="shell">
+  <nav class="side" aria-label="Main">
+    <a class="brand" href="<%= bp %>/"><img src="<%= bp %>/public/img/egpaf-mark.png" alt="EGPAF"><span><b>ECR 2.0</b><span>Compliance Registry</span></span></a>
+    <% items.forEach(([k, href, label, icon]) => { %>
+      <a class="nav <%= cur === k ? 'on' : '' %>" href="<%= bp %><%= href %>"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="<%= icon %>"/></svg><span><%= label %></span><% if (k === 'review' && typeof reviewBadge !== 'undefined' && reviewBadge) { %><span class="count"><%= reviewBadge %></span><% } %></a>
+    <% }) %>
+    <% if (d.isPreparer(user)) { %>
+      <a class="btn btn-pri" style="margin:12px 0 4px" href="<%= bp %>/changes/new"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="<%= I.plus %>"/></svg>Report a change</a>
+    <% } %>
+    <% if (d.isAdmin(user)) { %>
+      <div class="label" style="padding:18px 11px 6px">Administration</div>
+      <% admin.forEach(([k, href, label, icon]) => { %>
+        <a class="nav <%= cur === k ? 'on' : '' %>" href="<%= bp %><%= href %>"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="<%= icon %>"/></svg><span><%= label %></span></a>
+      <% }) %>
+    <% } %>
+    <div class="side-foot">
+      <div class="me"><span class="avatar"><%= initials %></span><div style="min-width:0"><div style="font-size:13.5px;font-weight:600"><%= user.name %></div><div class="muted" style="font-size:12px"><%= R.label %> · <%= scopeText %></div></div></div>
+      <form method="post" action="<%= bp %>/auth/logout"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="nav" type="submit" style="margin-top:6px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="<%= I.out %>"/></svg><span>Sign out</span></button></form>
+    </div>
+  </nav>
+  <div class="main">
+    <div class="topbar">
+      <form class="search" method="get" action="<%= bp %>/search" role="search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#58626D" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <label for="q" style="position:absolute;left:-9999px">Search</label>
+        <input id="q" name="q" class="input" placeholder="Search countries and obligations<%= d.isAdmin(user) ? ', people' : '' %>" value="<%= typeof q !== 'undefined' ? q : '' %>">
+      </form>
+      <div class="spacer muted small"><%= new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) %></div>
+    </div>
+    <div class="content">
+<% } %>

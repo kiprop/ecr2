@@ -1,0 +1,60 @@
+# ECR 2.0 production compose. Own PostgreSQL, no published DB port.
+# App listens on 127.0.0.1:8304 only; nginx proxies https://dhda.pedaids.org/ecr2/ to it.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - ecr2_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    image: ecr2:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DB_HOST: db
+      DB_PORT: 5432
+      PORT: 3000
+      STORAGE_DIR: /app/data/blobs
+    ports:
+      - "127.0.0.1:${APP_PUBLISHED_PORT:-8304}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ecr2_blobs:/app/data/blobs
+    # Migrations and the standard templates are applied on every start (both are idempotent).
+    command: ["sh", "-c", "node scripts/migrate.js && node scripts/seed.js && node src/server.js"]
+
+  worker:
+    image: ecr2:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DB_HOST: db
+      DB_PORT: 5432
+      STORAGE_DIR: /app/data/blobs
+    depends_on:
+      app:
+        condition: service_started
+    volumes:
+      - ecr2_blobs:/app/data/blobs
+    healthcheck:
+      disable: true
+    command: ["node", "src/worker.js"]
+
+volumes:
+  ecr2_pgdata:
+  ecr2_blobs:

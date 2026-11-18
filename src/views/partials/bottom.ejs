@@ -1,0 +1,10 @@
+<% if (user) { %>
+    </div>
+  </div>
+</div>
+<% } %>
+<% if (typeof drawer !== 'undefined' && drawer) { %><%- include('drawer') %><% } %>
+<% if (flash) { %><div class="toast" role="status"><%= flash %></div><% } %>
+<script src="<%= bp %>/public/js/app.js"></script>
+</body>
+</html>

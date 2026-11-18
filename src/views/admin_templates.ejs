@@ -1,0 +1,39 @@
+<%- include('partials/top') %>
+<% const meta = { setup: ['Establish', 'Completed once, when a country office registers. Due dates count from the day the country is added.'], annual: ['Operate · annual cycle', 'A new cycle opens for every operating country each year. Due dates count from the day the cycle opens.'], close: ['Close out', 'Used only when a programme closes. Steps sit in four gated stages.'] }; %>
+<div class="stack" style="gap:18px">
+  <div><h1>Requirement templates</h1><p class="sub">One standard checklist per phase, shared by all countries. Add local wording where a country's law differs. Changes apply from each country's next cycle or plan.</p></div>
+  <nav class="tabs"><% Object.entries(meta).forEach(([k, m]) => { %><a class="tab <%= phase === k ? 'on' : '' %>" href="<%= bp %>/admin/templates?phase=<%= k %>"><%= m[0] %></a><% }) %></nav>
+  <p class="muted" style="margin:0"><%= meta[phase][1] %></p>
+  <section class="card overflow">
+    <% items.forEach((t) => { const loc = locals.filter((l) => l.template_id === t.id); %>
+      <details class="row" style="display:block;<%= t.active ? '' : 'opacity:.55' %>">
+        <summary style="display:flex;gap:14px;align-items:center;cursor:pointer;list-style:none">
+          <span class="mono muted small" style="width:24px"><%= t.seq %></span>
+          <span class="grow"><%= t.text %><% loc.forEach((l) => { %><span class="meta"><%= l.country_name %>: <%= l.text %></span><% }) %></span>
+          <span class="muted small"><%= phase === 'close' ? 'Stage ' + t.stage : 'Due +' + t.due_days + ' days' %></span>
+          <% if (!t.active) { %><span class="chip c-muted">Retired</span><% } %>
+        </summary>
+        <div class="stack-s" style="padding:14px 0 4px 38px">
+          <form method="post" class="row-flex"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="phase" value="<%= phase %>"><input type="hidden" name="id" value="<%= t.id %>"><input type="hidden" name="action" value="save">
+            <input class="input" name="text" value="<%= t.text %>" style="flex:1 1 360px" aria-label="Requirement text">
+            <% if (phase !== 'close') { %><label class="row-flex small" style="gap:6px">Due +<input class="input" name="due_days" type="number" min="1" value="<%= t.due_days %>" style="width:90px">days</label><% } else { %><input type="hidden" name="due_days" value="<%= t.due_days %>"><% } %>
+            <button class="btn btn-sm">Save</button>
+            <button class="btn btn-sm" name="action" value="toggle"><%= t.active ? 'Retire' : 'Restore' %></button>
+          </form>
+          <form method="post" class="row-flex"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="phase" value="<%= phase %>"><input type="hidden" name="id" value="<%= t.id %>"><input type="hidden" name="action" value="local">
+            <select class="input" name="country" style="width:180px" aria-label="Country"><% countries.forEach((c) => { %><option value="<%= c.code %>"><%= c.name %></option><% }) %></select>
+            <input class="input" name="text" placeholder="Local wording for this country (blank removes it)" style="flex:1 1 300px">
+            <button class="btn btn-sm">Save local wording</button>
+          </form>
+        </div>
+      </details>
+    <% }) %>
+    <form method="post" class="row-flex" style="padding:14px 18px;border-top:1px solid var(--line2)">
+      <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="phase" value="<%= phase %>"><input type="hidden" name="action" value="add">
+      <input class="input" name="text" placeholder="New requirement, e.g. Renew data protection registration" style="flex:1 1 360px" aria-label="New requirement">
+      <% if (phase === 'close') { %><select class="input" name="stage" style="width:160px" aria-label="Stage"><% stages.forEach((s) => { %><option value="<%= s.n %>">Stage <%= s.n %> · <%= s.name %></option><% }) %></select><% } else { %><input class="input" name="due_days" type="number" min="1" value="90" style="width:100px" aria-label="Due after days"><% } %>
+      <button class="btn">Add to template</button>
+    </form>
+  </section>
+</div>
+<%- include('partials/bottom') %>

@@ -1,0 +1,46 @@
+<%- include('partials/top') %>
+<div class="stack" style="gap:18px;max-width:760px">
+  <div><a class="small" href="<%= bp %>/">← Home</a><h1 style="margin-top:4px"><%= def ? def.title : 'What changed?' %></h1><p class="sub"><%= def ? 'Tell us once. HQ reviews it, then the register and calendar update.' : 'Pick the kind of change. Each one asks only for what HQ needs.' %></p></div>
+
+  <% if (!def) { %>
+    <div class="stack-s">
+      <% Object.entries(changes).forEach(([k, c]) => { %>
+        <a class="opt" href="<%= bp %>/changes/new?type=<%= k %>&country=<%= code %>" style="text-decoration:none;color:inherit;align-items:center"><span style="flex:1"><b style="display:block"><%= c.title %></b><span class="muted small"><%= c.desc %></span></span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A939C" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></a>
+      <% }) %>
+    </div>
+  <% } else { %>
+  <form method="post" action="<%= bp %>/changes" enctype="multipart/form-data" class="stack-s" style="gap:18px">
+    <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="type" value="<%= type %>">
+    <section class="card pad stack-s" style="gap:14px">
+      <div class="row-flex"><span class="dot dot-now">1</span><b>Details</b></div>
+      <% if (countries.length > 1) { %>
+        <label class="field">Country<select class="input" name="country" data-reload="<%= bp %>/changes/new?type=<%= type %>&country="><% countries.forEach((c) => { %><option value="<%= c.code %>" <%= c.code === code ? 'selected' : '' %>><%= c.name %></option><% }) %></select></label>
+      <% } else { %><input type="hidden" name="country" value="<%= code %>"><% } %>
+      <% def.fields.forEach((f) => { %>
+        <label class="field"><%= f.label %>
+          <% if (f.type === 'account') { %>
+            <select class="input" name="<%= f.k %>" required><% accounts.forEach((a) => { %><option value="<%= a.id %>"><%= a.data.bank %> · <%= a.data.account_type || '' %> · <%= a.data.currency || '' %> · •••• <%= a.data.last4 || '' %></option><% }) %></select>
+            <% if (!accounts.length) { %><span class="muted small">No bank accounts are recorded for this country yet. Ask HQ to add them first.</span><% } %>
+          <% } else if (f.type === 'member') { %>
+            <select class="input" name="<%= f.k %>"><option value="">Nobody is leaving</option><% members.forEach((m) => { %><option value="<%= m.id %>"><%= m.data.name %><%= m.data.position ? ' (' + m.data.position + ')' : '' %></option><% }) %></select>
+          <% } else { %><input class="input" type="<%= f.type %>" name="<%= f.k %>"><% } %>
+        </label>
+      <% }) %>
+    </section>
+    <section class="card pad stack-s">
+      <div class="row-flex"><span class="dot dot-now">2</span><b>Evidence</b></div>
+      <p class="muted" style="margin:0;font-size:14px">HQ needs these to accept the change. You can submit with gaps, but it stays pending until they are in.</p>
+      <% def.evidence.forEach((e, i) => { %>
+        <label class="field" style="font-weight:500"><%= e %><span class="file-drop"><input type="file" name="evidence_<%= i %>"></span></label>
+      <% }) %>
+    </section>
+    <section class="card pad stack-s">
+      <div class="row-flex"><span class="dot dot-now">3</span><b>Submit</b></div>
+      <% def.followups.forEach((f) => { %><div class="row-flex" style="gap:10px;font-size:14px;flex-wrap:nowrap;align-items:flex-start"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F6B47" stroke-width="2.6" aria-hidden="true" style="flex:none"><path d="M5 12l5 5L20 7"/></svg><span><%= f %></span></div><% }) %>
+      <label class="field">Note for HQ (optional)<textarea class="input" name="note" rows="2"></textarea></label>
+      <div class="row-flex"><button class="btn btn-pri" type="submit">Submit change</button><a class="btn" href="<%= bp %>/">Cancel</a></div>
+    </section>
+  </form>
+  <% } %>
+</div>
+<%- include('partials/bottom') %>

@@ -1,0 +1,41 @@
+<%- include('partials/top') %>
+<% const months = ['January','February','March','April','May','June','July','August','September','October','November','December']; %>
+<div class="stack" style="gap:18px;max-width:860px">
+  <div><h1>Settings</h1><p class="sub">Rules that apply to every country.</p></div>
+  <form method="post" class="stack-s" style="gap:18px">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <section class="card pad stack-s">
+      <b>Reminder lead times</b>
+      <span class="muted small">Owners get an email this many days before a deadline, then weekly once overdue.<%= mail ? '' : ' Email sending is not configured yet, so reminders are logged only.' %></span>
+      <div class="pills"><% [120, 90, 60, 30, 14, 7].forEach((n) => { %><label class="pill"><input type="checkbox" name="lead_days" value="<%= n %>" <%= s.lead_days.includes(n) ? 'checked' : '' %>><%= n %> days</label><% }) %></div>
+    </section>
+    <section class="card pad row-flex">
+      <div style="flex:1 1 300px"><b>Annual cycle opens</b><div class="muted small">A new cycle is created for each operating country on the 1st of this month.</div></div>
+      <select class="input" name="cycle_month" style="width:180px" aria-label="Cycle month"><% months.forEach((m, i) => { %><option value="<%= i + 1 %>" <%= s.cycle_month === i + 1 ? 'selected' : '' %>><%= m %></option><% }) %></select>
+    </section>
+    <section class="card pad row-flex">
+      <div style="flex:1 1 300px"><b>Planning horizon</b><div class="muted small">How far ahead register dates (expiries, terms, confirmations) become tasks.</div></div>
+      <label class="row-flex small" style="gap:6px"><input class="input" type="number" name="horizon_days" min="30" max="730" value="<%= s.horizon_days %>" style="width:100px"> days</label>
+    </section>
+    <section class="card pad row-flex">
+      <div style="flex:1 1 300px"><b>Conflict-of-interest declarations</b><div class="muted small">Days allowed to collect a missing declaration.</div></div>
+      <label class="row-flex small" style="gap:6px"><input class="input" type="number" name="coi_due_days" min="1" value="<%= s.coi_due_days %>" style="width:100px"> days</label>
+    </section>
+    <section class="card pad row-flex">
+      <div style="flex:1 1 300px"><b>Weekly digest</b><div class="muted small">Monday email to each person summarising what needs them.</div></div>
+      <label class="check-row"><input type="checkbox" name="digest" <%= s.digest ? 'checked' : '' %>>On</label>
+    </section>
+    <div><button class="btn btn-pri">Save settings</button></div>
+  </form>
+
+  <section class="card pad stack-s">
+    <b>Annual cycles</b>
+    <% cycles.forEach((c) => { %><div class="row-flex small"><span class="mono" style="width:80px"><%= c.label %></span><span class="muted"><%= c.n %> countries · <%= c.signed %> signed off</span></div><% }) %>
+    <form method="post" class="row-flex"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="open_cycle">
+      <input class="input" name="label" value="<%= nextLabel %>" style="width:120px" aria-label="Cycle label">
+      <button class="btn" data-confirm="Open this cycle for every operating country that does not have it yet?">Open cycle now</button>
+      <span class="muted small">Normally automatic on the 1st of the cycle month.</span>
+    </form>
+  </section>
+</div>
+<%- include('partials/bottom') %>

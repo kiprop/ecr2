@@ -1,0 +1,40 @@
+<%- include('partials/top') %>
+<% const isNew = target.id === 'new'; %>
+<div class="stack" style="gap:18px;max-width:760px">
+  <div><a class="small" href="<%= bp %>/admin/users">← Users &amp; access</a><h1 style="margin-top:4px"><%= isNew ? 'Invite a person' : target.name %></h1><p class="sub"><%= isNew ? 'EGPAF staff only. They sign in with their Microsoft account; no password is created.' : target.email %></p></div>
+  <form method="post" action="<%= bp %>/admin/users/<%= target.id %>" class="stack-s" style="gap:18px">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <% if (isNew) { %>
+      <section class="card pad stack-s" style="gap:14px">
+        <% if (directory) { %>
+          <label class="field">Find the person in the EGPAF directory<input class="input" id="dir-q" placeholder="Type a name or email" autocomplete="off" data-dir="<%= bp %>/admin/directory"></label>
+          <div id="dir-results" class="stack-s" style="gap:6px"></div>
+        <% } %>
+        <label class="field">Name<input class="input" name="name" id="f-name" required></label>
+        <label class="field">EGPAF email<input class="input" name="email" id="f-email" type="email" placeholder="name@pedaids.org" required></label>
+        <label class="field">Job title (optional)<input class="input" name="title" id="f-title"></label>
+      </section>
+    <% } else { %>
+      <section class="card pad"><label class="field">Job title (optional)<input class="input" name="title" value="<%= target.title || '' %>"></label></section>
+    <% } %>
+    <section class="card pad stack-s" style="gap:8px">
+      <b>Role</b>
+      <% Object.entries(d.ROLES).forEach(([k, r]) => { %>
+        <label class="opt"><input type="radio" name="role" value="<%= k %>" <%= target.role === k ? 'checked' : '' %>><span><b style="display:block;font-size:14px"><%= r.label %></b><span class="muted small"><%= r.desc %></span></span></label>
+      <% }) %>
+    </section>
+    <section class="card pad stack-s" style="gap:10px">
+      <b>Countries</b>
+      <span class="muted small">Required for Country Directors and focal points. Ignored for administrators and HQ reviewers, who see all countries. Leave empty for leadership to see all.</span>
+      <div class="pills">
+        <% countries.forEach((c) => { %><label class="pill"><input type="checkbox" name="countries" value="<%= c.code %>" <%= target.countries.includes(c.code) ? 'checked' : '' %>><%= c.name %></label><% }) %>
+      </div>
+    </section>
+    <div class="row-flex">
+      <button class="btn btn-pri" type="submit"><%= isNew ? 'Send invitation' : 'Save changes' %></button>
+      <a class="btn" href="<%= bp %>/admin/users">Cancel</a>
+      <% if (!isNew && target.id !== user.id) { %><button class="btn btn-ret spacer" name="action" value="toggle" data-confirm="<%= target.status === 'inactive' ? 'Reactivate' : 'Deactivate' %> <%= target.name %>?"><%= target.status === 'inactive' ? 'Reactivate' : 'Deactivate' %></button><% } %>
+    </div>
+  </form>
+</div>
+<%- include('partials/bottom') %>
