@@ -125,14 +125,16 @@ a.kpi{text-decoration:none;color:inherit}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 18px;border-radius:10px;font-size:14px;z-index:40;box-shadow:0 8px 24px rgba(0,0,0,.2);max-width:90vw;animation:fade 4.5s forwards}
 @keyframes fade{0%,80%{opacity:1}100%{opacity:0;visibility:hidden}}
 
-/* login */
-.login{min-height:100vh;display:flex;flex-wrap:wrap;background:var(--bg)}
-.login-left{flex:1 1 460px;padding:clamp(28px,6vw,88px);display:flex;flex-direction:column;justify-content:center;gap:28px}
-.login-left img{width:min(340px,80%);height:auto}
-.login-left h1{font-size:clamp(30px,3.4vw,42px);line-height:1.1}
-.login-right{flex:1 1 420px;display:flex;align-items:center;justify-content:center;padding:28px 16px;background:#fff;border-left:1px solid var(--line)}
-.login-card{width:min(420px,100%);display:flex;flex-direction:column;gap:18px}
+/* login: two balanced halves, both vertically centred, nothing pushed to an edge */
+.login{min-height:100vh;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);background:var(--bg)}
+.login-left{display:flex;align-items:center;justify-content:center;padding:clamp(24px,5vh,64px) clamp(24px,5vw,80px)}
+.login-left>.inner{width:min(600px,100%);display:flex;flex-direction:column;gap:clamp(16px,3vh,28px)}
+.login-left img{width:min(320px,80%);height:auto}
+.login-left h1{font-size:clamp(28px,3vw,42px);line-height:1.1}
+.login-right{display:flex;align-items:center;justify-content:center;padding:clamp(24px,5vh,64px) 24px;background:#fff;border-left:1px solid var(--line)}
+.login-card{width:min(440px,100%);display:flex;flex-direction:column;gap:16px}
 .feature{display:flex;gap:12px}.feature svg{flex:none;margin-top:2px}
+@media (max-width:860px){.login{grid-template-columns:1fr}.login-right{order:-1;border-left:0;border-bottom:1px solid var(--line)}}
 .divider{display:flex;align-items:center;gap:10px}.divider:before,.divider:after{content:"";flex:1;height:1px;background:var(--line)}
 
 @media (max-width:700px){.side{flex-basis:100%;border-right:0;border-bottom:1px solid var(--line)}.content{padding-top:18px}}
