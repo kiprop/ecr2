@@ -39,6 +39,7 @@ services:
 
   worker:
     image: ecr2:latest
+    pull_policy: never
     restart: unless-stopped
     env_file: .env
     environment:
