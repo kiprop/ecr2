@@ -28,6 +28,11 @@
     <div><button class="btn btn-pri">Save settings</button></div>
   </form>
 
+  <section class="card pad row-flex">
+    <div style="flex:1 1 300px"><b>Email delivery</b><div class="muted small"><%= mailMode === 'log' ? 'Not configured. Reminders and invitations are logged only.' : (mailMode === 'smtp' ? 'SMTP' : 'Microsoft Graph') + ' · sending as ' + mailFrom %></div></div>
+    <form method="post"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="test_mail"><button class="btn">Send me a test email</button></form>
+  </section>
+
   <section class="card pad stack-s">
     <b>Annual cycles</b>
     <% cycles.forEach((c) => { %><div class="row-flex small"><span class="mono" style="width:80px"><%= c.label %></span><span class="muted"><%= c.n %> countries · <%= c.signed %> signed off</span></div><% }) %>

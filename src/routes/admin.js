@@ -155,10 +155,24 @@ r.post('/countries', async (req, res) => {
 r.get('/settings', async (req, res) => {
   const s = await D.getSettings();
   const cycles = await db.q(`SELECT label, count(*)::int n, sum(CASE WHEN status='signed_off' THEN 1 ELSE 0 END)::int signed FROM cycles WHERE kind='annual' GROUP BY label ORDER BY label DESC`);
-  res.render('admin_settings', { title: 'Settings', nav: 'settings', s, cycles, nextLabel: D.fyLabel(D.todayISO(), s.cycle_month), mail: !!config.mail.sender });
+  res.render('admin_settings', { title: 'Settings', nav: 'settings', s, cycles, nextLabel: D.fyLabel(D.todayISO(), s.cycle_month), mail: graph.mailMode() !== 'log', mailMode: graph.mailMode(), mailFrom: config.mail.sender || (config.mail.smtp && config.mail.smtp.from) || '' });
 });
 r.post('/settings', async (req, res) => {
   const b = req.body;
+  if (b.action === 'test_mail') {
+    try {
+      const r = await graph.sendMail(req.user.email, 'ECR 2.0 test email', `<p>This is a test from ECR 2.0, sent by ${graph.mailMode().toUpperCase()}. If you can read it, reminders will be delivered.</p>`, { throwOnError: true });
+      req.flash(r === 'logged' ? 'Email is not configured, so the test was only logged.' : `Test email sent to ${req.user.email}. Check your inbox.`);
+    } catch (e) {
+      const msg = String(e.message || e);
+      req.flash(/SmtpClientAuthentication is disabled|5\.7\.139/i.test(msg)
+        ? 'Sending failed: Microsoft 365 has SMTP sign-in turned off for this mailbox. Ask IT to enable Authenticated SMTP for it, or to grant the app Mail.Send.'
+        : /535|Authentication/i.test(msg) ? 'Sending failed: the mailbox rejected the username or password (or MFA blocks it). Check SMTP_USER and SMTP_PASSWORD.'
+        : 'Sending failed: ' + msg.slice(0, 200));
+    }
+    await D.audit(req.user.id, 'settings.mail_test', graph.mailMode());
+    return res.redirect('/admin/settings');
+  }
   if (b.action === 'open_cycle') {
     const label = String(b.label || '').trim().slice(0, 20);
     const out = await D.openAnnualCycles(req.user.id, label || null);

@@ -14,8 +14,27 @@ async function token() {
   return cached.token;
 }
 
-async function sendMail(to, subject, html) {
-  if (!config.mail.sender) { console.log(`[mail:log-only] to=${to} subject="${subject}"`); return 'logged'; }
+let smtp = null;
+function smtpTransport() {
+  if (!smtp) {
+    const c = config.mail.smtp;
+    smtp = require('nodemailer').createTransport({ host: c.host, port: c.port, secure: c.secure, requireTLS: !c.secure, auth: c.user ? { user: c.user, pass: c.pass } : undefined });
+  }
+  return smtp;
+}
+
+function mailMode() { return config.mail.sender ? 'graph' : (config.mail.smtp ? 'smtp' : 'log'); }
+
+// Returns 'sent' | 'logged' | 'failed'. With throwOnError, failures throw (used by the test button).
+async function sendMail(to, subject, html, { throwOnError = false } = {}) {
+  const mode = mailMode();
+  if (mode === 'log') { console.log(`[mail:log-only] to=${to} subject="${subject}"`); return 'logged'; }
+  if (mode === 'smtp') {
+    try {
+      await smtpTransport().sendMail({ from: config.mail.smtp.from, to, subject, html });
+      return 'sent';
+    } catch (e) { console.error('[mail:smtp]', e.message); if (throwOnError) throw e; return 'failed'; }
+  }
   try {
     const r = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(config.mail.sender)}/sendMail`, {
       method: 'POST', headers: { Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' },
@@ -23,7 +42,7 @@ async function sendMail(to, subject, html) {
     });
     if (!r.ok) throw new Error(`sendMail ${r.status} ${await r.text()}`);
     return 'sent';
-  } catch (e) { console.error('[mail]', e.message); return 'failed'; }
+  } catch (e) { console.error('[mail:graph]', e.message); if (throwOnError) throw e; return 'failed'; }
 }
 
 async function searchUsers(q) {
@@ -36,4 +55,4 @@ async function searchUsers(q) {
   return (j.value || []).filter((u) => u.mail && /@pedaids\.org$/i.test(u.mail)).map((u) => ({ name: u.displayName, email: u.mail.toLowerCase(), title: u.jobTitle || '' }));
 }
 
-module.exports = { sendMail, searchUsers };
+module.exports = { sendMail, searchUsers, mailMode };

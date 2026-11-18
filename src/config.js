@@ -30,7 +30,15 @@ module.exports = {
   storageDir: path.resolve(env.STORAGE_DIR || './data/blobs'),
   maxUploadMb: Number(env.MAX_UPLOAD_MB || 25),
   mail: {
-    sender: env.MAIL_SENDER || '',          // mailbox Graph sends as; blank = log only
+    sender: env.MAIL_SENDER || '',          // Graph: mailbox to send as (needs Mail.Send application permission)
+    smtp: env.SMTP_HOST ? {                 // SMTP alternative when Graph permission is not available
+      host: env.SMTP_HOST,
+      port: Number(env.SMTP_PORT || 587),
+      secure: Number(env.SMTP_PORT || 587) === 465,
+      user: env.SMTP_USER || '',
+      pass: env.SMTP_PASSWORD || '',
+      from: env.SMTP_FROM || env.SMTP_USER || '',
+    } : null,
   },
   directorySearch: env.DIRECTORY_SEARCH === 'true', // needs Graph User.Read.All (application)
   workerIntervalMin: Number(env.WORKER_INTERVAL_MIN || 60),

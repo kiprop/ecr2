@@ -43,6 +43,13 @@ Updating: `git pull && docker compose up -d --build`. Migrations run on start.
 
 Backups: `docker compose exec -T db pg_dump -U ecr2 ecr2 | gzip > ~/ecr2-$(date +%F).sql.gz` and the `ecr2_blobs` volume (uploaded evidence).
 
+## Email
+
+With nothing configured, reminders, digests and invitations are logged only and everything else works.
+
+- **SMTP** (no Entra permission needed): set `SMTP_HOST=smtp.office365.com`, `SMTP_PORT=587`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`. Microsoft 365 only accepts this when *Authenticated SMTP* is enabled for that mailbox and the account does not require MFA. Use **Settings › Send me a test email**; the message explains any failure.
+- **Microsoft Graph**: set `MAIL_SENDER` (needs `Mail.Send`, below). It takes priority over SMTP.
+
 ## Optional Microsoft Graph features
 
 Both use the same app registration with **application** permissions and admin consent:
