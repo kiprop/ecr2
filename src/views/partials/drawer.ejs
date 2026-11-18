@@ -66,7 +66,35 @@
         </form>
       <% } %>
 
-      <% if (!drawer.canSubmit && !drawer.canReview) { %>
+      <% if (drawer.hqWaiting) { %>
+        <div class="notice notice-info"><%= o.status === 'returned' ? 'Returned to the country office. It comes back here once they resubmit.' : 'Waiting for the country office. Once they submit evidence, Accept and Return appear here.' %></div>
+        <div>
+          <div class="label">Responsible</div>
+          <% if (drawer.team.length) { %>
+            <div style="margin-top:6px;font-size:14px"><%= drawer.team.map((t) => t.name + (t.role === 'director' ? ' (Country Director)' : '')).join(', ') %></div>
+          <% } else { %>
+            <div class="notice notice-warn" style="margin-top:6px">Nobody is assigned to <%= o.country_name %> yet, so nobody can submit this.<% if (user.role === 'admin') { %> <a href="<%= bp %>/admin/users">Assign someone in Users &amp; access</a>.<% } %></div>
+          <% } %>
+        </div>
+        <% if (drawer.team.length && o.status === 'todo') { %>
+          <form method="post" action="<%= bp %>/items/<%= o.id %>/remind" class="stack-s" style="gap:8px">
+            <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="returnTo" value="<%= back %>">
+            <input class="input" name="note" placeholder="Add a message (optional)">
+            <div><button class="btn" type="submit">Send a reminder</button></div>
+          </form>
+        <% } %>
+        <% if (o.due_date) { %>
+          <details>
+            <summary class="small" style="cursor:pointer;color:var(--pri);font-weight:600">Change the due date for <%= o.country_name %></summary>
+            <form method="post" action="<%= bp %>/items/<%= o.id %>/due" class="row-flex" style="margin-top:10px;gap:8px">
+              <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="returnTo" value="<%= back %>">
+              <input class="input" type="date" name="due_date" value="<%= o.due_date %>" required style="width:170px">
+              <input class="input" name="note" placeholder="Why, e.g. statutory date is 31 March" style="flex:1 1 200px">
+              <button class="btn btn-sm" type="submit">Save</button>
+            </form>
+          </details>
+        <% } %>
+      <% } else if (!drawer.canSubmit && !drawer.canReview) { %>
         <div class="notice notice-info"><%= o.status === 'submitted' ? 'Submitted. HQ will review it, and the outcome shows on the Home page.' : o.status === 'accepted' ? 'Accepted by HQ. Nothing more to do.' : o.status === 'na' ? 'Marked not applicable for this cycle.' : 'The country office has not submitted this yet.' %></div>
       <% } %>
 

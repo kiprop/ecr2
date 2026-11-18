@@ -6,6 +6,7 @@ const multer = require('multer');
 const config = require('../config');
 const db = require('../db');
 const D = require('../domain');
+const graph = require('../graph');
 
 const upload = multer({
   storage: multer.diskStorage({
@@ -78,7 +79,10 @@ module.exports = function appRoutes(csrfCheck) {
       const docs = await db.q(`SELECT d.*, u.name AS by_name FROM documents d LEFT JOIN users u ON u.id=d.uploaded_by WHERE obligation_id=$1 ORDER BY uploaded_at DESC`, [o.id]);
       const events = await db.q(`SELECT e.*, u.name AS who FROM events e LEFT JOIN users u ON u.id=e.user_id WHERE obligation_id=$1 ORDER BY at DESC`, [o.id]);
       const dec = D.decorate(o);
+      // For HQ looking at an item the country has not submitted: who is responsible for it
+      const team = D.canReview(req.user) ? await db.q(`SELECT u.name, u.role FROM users u JOIN user_countries uc ON uc.user_id=u.id WHERE uc.country_code=$1 AND u.role IN ('director','focal') AND u.status<>'inactive' ORDER BY u.role, u.name`, [o.country_code]) : [];
       res.locals.drawer = {
+        team, hqWaiting: D.canReview(req.user) && dec.isOpen && o.status !== 'submitted' && o.area !== 'close',
         o: dec, docs, events, fields: D.fieldsFor(o), payload: o.payload || {},
         canSubmit: canPrepareIn(req, o.country_code) && dec.isOpen && o.area !== 'close',
         canReview: D.canReview(req.user) && o.status === 'submitted',
@@ -213,6 +217,34 @@ module.exports = function appRoutes(csrfCheck) {
     await db.q(`UPDATE obligations SET status='na' WHERE id=$1`, [o.id]);
     await D.audit(req.user.id, 'item.na', (req.body.note || 'marked not applicable this cycle').slice(0, 500), o.country_code, o.id);
     req.flash('Marked not applicable for this cycle.');
+    res.redirect(safeReturn(req.body.returnTo));
+  });
+
+  // HQ nudges the country team about an item they have not submitted
+  r.post('/items/:id/remind', async (req, res) => {
+    const o = await loadItem(req, req.params.id);
+    if (!D.canReview(req.user) || !['todo', 'returned'].includes(o.status)) throw httpError(403, 'Not allowed.');
+    const team = await db.q(`SELECT u.id, u.email FROM users u JOIN user_countries uc ON uc.user_id=u.id WHERE uc.country_code=$1 AND u.role IN ('director','focal') AND u.status='active'`, [o.country_code]);
+    if (!team.length) { req.flash('Nobody is assigned to this country yet. Give someone the country under Users & access first.'); return res.redirect(safeReturn(req.body.returnTo)); }
+    const country = (await db.one(`SELECT name FROM countries WHERE code=$1`, [o.country_code])).name;
+    const msg = String(req.body.note || '').trim().slice(0, 500);
+    await D.notifyInbox(db, team.map((u) => u.id), { kind: 'reminder', title: `Reminder from HQ: ${o.title}`, body: `${country} · due ${D.fmtDate(o.due_date)}${msg ? ' · ' + msg : ''}`, link: `/?item=${o.id}`, code: o.country_code }, req.user.id);
+    const url = `${config.appBaseUrl}${config.basePath}/?item=${o.id}`;
+    for (const u of team) graph.sendMail(u.email, `Reminder from HQ: ${o.title}`, `<p>${req.user.name} sent a reminder about <b>${o.title}</b> for ${country}, due ${D.fmtDate(o.due_date)}.</p>${msg ? `<p>${msg.replace(/[<>&]/g, '')}</p>` : ''}<p><a href="${url}">Open it in ECR 2.0</a></p>`).catch(() => {});
+    await D.audit(req.user.id, 'item.reminded', msg || `reminder sent to ${team.length} ${team.length === 1 ? 'person' : 'people'}`, o.country_code, o.id);
+    req.flash(`Reminder sent to ${team.length} ${team.length === 1 ? 'person' : 'people'}.`);
+    res.redirect(safeReturn(req.body.returnTo));
+  });
+
+  // HQ sets the real statutory date for this country
+  r.post('/items/:id/due', async (req, res) => {
+    const o = await loadItem(req, req.params.id);
+    const due = String(req.body.due_date || '');
+    if (!D.canReview(req.user) || !['todo', 'returned'].includes(o.status) || !/^\d{4}-\d{2}-\d{2}$/.test(due)) throw httpError(403, 'Not allowed.');
+    await db.q(`UPDATE obligations SET due_date=$2 WHERE id=$1`, [o.id, due]);
+    const why = String(req.body.note || '').trim().slice(0, 300);
+    await D.audit(req.user.id, 'item.due_changed', `Due date: ${D.fmtDate(o.due_date)} → ${D.fmtDate(due)}${why ? ' · ' + why : ''}`, o.country_code, o.id);
+    req.flash('Due date changed.');
     res.redirect(safeReturn(req.body.returnTo));
   });
 
