@@ -31,7 +31,7 @@ async function sendMail(to, subject, html, { throwOnError = false } = {}) {
   if (mode === 'log') { console.log(`[mail:log-only] to=${to} subject="${subject}"`); return 'logged'; }
   if (mode === 'smtp') {
     try {
-      await smtpTransport().sendMail({ from: config.mail.smtp.from, to, subject, html });
+      await smtpTransport().sendMail({ from: config.mail.smtp.from, to, subject, html, text: require('./email').toText(html) });
       return 'sent';
     } catch (e) { console.error('[mail:smtp]', e.message); if (throwOnError) throw e; return 'failed'; }
   }

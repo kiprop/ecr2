@@ -3,6 +3,7 @@ const config = require('../config');
 const db = require('../db');
 const D = require('../domain');
 const graph = require('../graph');
+const mail = require('../email');
 
 const r = express.Router();
 r.use((req, res, next) => {
@@ -39,8 +40,8 @@ r.post('/users/:id/resend', async (req, res) => {
   const codes = (await db.q(`SELECT c.name FROM user_countries uc JOIN countries c ON c.code=uc.country_code WHERE uc.user_id=$1 ORDER BY c.name`, [u.id])).map((x) => x.name);
   const names = D.ROLES[u.role].all || !codes.length ? 'all countries' : codes.join(', ');
   const link = `${config.appBaseUrl}${config.basePath}/`;
-  const sent = await graph.sendMail(u.email, 'You have access to the EGPAF Compliance Registry (ECR 2.0)',
-    `<p>Hello ${u.name},</p><p>${req.user.name} has given you access to ECR 2.0 as <b>${D.ROLES[u.role].label}</b> for ${names}.</p><p>Sign in with your EGPAF Microsoft account: <a href="${link}">${link}</a></p>`);
+  const m = mail.invite({ name: u.name, by: req.user.name, role: D.ROLES[u.role].label, countries: names });
+  const sent = await graph.sendMail(u.email, m.subject, m.html);
   await D.audit(req.user.id, 'user.reinvited', `invitation resent to ${u.name} (${sent})`);
   req.flash(sent === 'sent' ? `Invitation emailed to ${u.email}.` : `The email did not go (${sent === 'logged' ? 'email is not set up' : 'sending failed'}). Send them the link yourself: ${link}`);
   res.redirect(`/admin/users/${u.id}`);
@@ -68,8 +69,8 @@ r.post('/users/:id', async (req, res) => {
       await D.audit(req.user.id, 'user.invited', `invited ${name} as ${D.ROLES[role].label} for ${names}`, null, null, c);
       await D.notifyInbox(c, [u.id], { kind: 'welcome', title: 'Welcome to ECR 2.0', body: `${req.user.name} gave you access as ${D.ROLES[role].label} for ${names}.`, link: '/' });
     });
-    const sent = await graph.sendMail(email, 'You have access to the EGPAF Compliance Registry (ECR 2.0)',
-      `<p>Hello ${name},</p><p>${req.user.name} has given you access to ECR 2.0 as <b>${D.ROLES[role].label}</b> for ${names}.</p><p>Sign in with your EGPAF Microsoft account: <a href="${config.appBaseUrl}${config.basePath}/">${config.appBaseUrl}${config.basePath}/</a></p>`);
+    const m = mail.invite({ name, by: req.user.name, role: D.ROLES[role].label, countries: names });
+    const sent = await graph.sendMail(email, m.subject, m.html);
     const link = `${config.appBaseUrl}${config.basePath}/`;
     req.flash(sent === 'sent' ? `Invitation emailed to ${email}.`
       : sent === 'logged' ? `${name} has access, but email is not set up, so no invitation was sent. Send them the link yourself: ${link}`
@@ -182,7 +183,8 @@ r.post('/settings', async (req, res) => {
   const b = req.body;
   if (b.action === 'test_mail') {
     try {
-      const r = await graph.sendMail(req.user.email, 'ECR 2.0 test email', `<p>This is a test from ECR 2.0, sent by ${graph.mailMode().toUpperCase()}. If you can read it, reminders will be delivered.</p>`, { throwOnError: true });
+      const m = mail.test({ mode: graph.mailMode() });
+      const r = await graph.sendMail(req.user.email, m.subject, m.html, { throwOnError: true });
       req.flash(r === 'logged' ? 'Email is not configured, so the test was only logged.' : `Test email sent to ${req.user.email}. Check your inbox.`);
     } catch (e) {
       const msg = String(e.message || e);

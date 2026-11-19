@@ -7,6 +7,7 @@ const config = require('../config');
 const db = require('../db');
 const D = require('../domain');
 const graph = require('../graph');
+const mail = require('../email');
 
 const upload = multer({
   storage: multer.diskStorage({
@@ -250,13 +251,16 @@ module.exports = function appRoutes(csrfCheck) {
   r.post('/items/:id/remind', async (req, res) => {
     const o = await loadItem(req, req.params.id);
     if (!D.canReview(req.user) || !['todo', 'returned'].includes(o.status)) throw httpError(403, 'Not allowed.');
-    const team = await db.q(`SELECT u.id, u.email FROM users u JOIN user_countries uc ON uc.user_id=u.id WHERE uc.country_code=$1 AND u.role IN ('director','focal') AND u.status='active'`, [o.country_code]);
+    const team = await db.q(`SELECT u.id, u.email, u.name FROM users u JOIN user_countries uc ON uc.user_id=u.id WHERE uc.country_code=$1 AND u.role IN ('director','focal') AND u.status='active'`, [o.country_code]);
     if (!team.length) { req.flash('Nobody is assigned to this country yet. Give someone the country under Users & access first.'); return res.redirect(safeReturn(req.body.returnTo)); }
     const country = (await db.one(`SELECT name FROM countries WHERE code=$1`, [o.country_code])).name;
     const msg = String(req.body.note || '').trim().slice(0, 500);
     await D.notifyInbox(db, team.map((u) => u.id), { kind: 'reminder', title: `Reminder from HQ: ${o.title}`, body: `${country} · due ${D.fmtDate(o.due_date)}${msg ? ' · ' + msg : ''}`, link: `/?item=${o.id}`, code: o.country_code }, req.user.id);
     const url = `${config.appBaseUrl}${config.basePath}/?item=${o.id}`;
-    for (const u of team) graph.sendMail(u.email, `Reminder from HQ: ${o.title}`, `<p>${req.user.name} sent a reminder about <b>${o.title}</b> for ${country}, due ${D.fmtDate(o.due_date)}.</p>${msg ? `<p>${msg.replace(/[<>&]/g, '')}</p>` : ''}<p><a href="${url}">Open it in ECR 2.0</a></p>`).catch(() => {});
+    for (const u of team) {
+      const m = mail.hqReminder({ name: u.name, by: req.user.name, item: o.title, country, area: D.AREAS[o.area], due: D.fmtDate(o.due_date), message: msg, href: url });
+      graph.sendMail(u.email, m.subject, m.html).catch(() => {});
+    }
     await D.audit(req.user.id, 'item.reminded', msg || `reminder sent to ${team.length} ${team.length === 1 ? 'person' : 'people'}`, o.country_code, o.id);
     req.flash(`Reminder sent to ${team.length} ${team.length === 1 ? 'person' : 'people'}.`);
     res.redirect(safeReturn(req.body.returnTo));
