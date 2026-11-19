@@ -136,7 +136,7 @@ module.exports = function appRoutes(csrfCheck) {
   // ------------------------------------------------------------ country file
   r.get('/countries/:code', async (req, res) => {
     const code = req.params.code.toUpperCase();
-    if (!inScope(req, code)) throw httpError(404, 'That country is not in your list.');
+    if (!inScope(req, code)) throw httpError(404, 'That country is not assigned to you. Ask the ECR administrator to add it under Users & access.');
     const country = await db.one(`SELECT * FROM countries WHERE code=$1`, [code]);
     const curPhase = country.phase === 'closed' ? 'close' : country.phase;
     const view = ['establish', 'operate', 'close'].includes(req.query.phase) ? req.query.phase : curPhase;

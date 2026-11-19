@@ -5,6 +5,9 @@
     <p class="sub"><%= needs.length %> <%= needs.length === 1 ? 'obligation needs' : 'obligations need' %> you in the next 90 days<%= overdue ? ', including ' + overdue + ' overdue' : '' %>.</p>
   </div>
 
+  <% if (!stats.length) { %>
+    <div class="notice notice-warn">No countries are assigned to you yet, so there is nothing to show here. Ask the ECR administrator to give you your countries in Users &amp; access.</div>
+  <% } %>
   <% signoff.forEach((c) => { %>
     <div class="card pad row-flex" style="border-color:#A9C3C6;background:#F5FAFA">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F5A64" stroke-width="2" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>
