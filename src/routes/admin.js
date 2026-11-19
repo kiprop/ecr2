@@ -32,6 +32,20 @@ r.get('/users/:id', async (req, res) => {
   res.render('admin_user_edit', { title: target.id === 'new' ? 'Invite a person' : 'Edit access', nav: 'users', target, countries, directory: config.directorySearch });
 });
 
+// Send the invitation email again (e.g. when email was not set up the first time)
+r.post('/users/:id/resend', async (req, res) => {
+  const u = await db.one(`SELECT * FROM users WHERE id=$1`, [req.params.id]);
+  if (!u || u.status === 'inactive') { req.flash('Reactivate this person first.'); return res.redirect('/admin/users'); }
+  const codes = (await db.q(`SELECT c.name FROM user_countries uc JOIN countries c ON c.code=uc.country_code WHERE uc.user_id=$1 ORDER BY c.name`, [u.id])).map((x) => x.name);
+  const names = D.ROLES[u.role].all || !codes.length ? 'all countries' : codes.join(', ');
+  const link = `${config.appBaseUrl}${config.basePath}/`;
+  const sent = await graph.sendMail(u.email, 'You have access to the EGPAF Compliance Registry (ECR 2.0)',
+    `<p>Hello ${u.name},</p><p>${req.user.name} has given you access to ECR 2.0 as <b>${D.ROLES[u.role].label}</b> for ${names}.</p><p>Sign in with your EGPAF Microsoft account: <a href="${link}">${link}</a></p>`);
+  await D.audit(req.user.id, 'user.reinvited', `invitation resent to ${u.name} (${sent})`);
+  req.flash(sent === 'sent' ? `Invitation emailed to ${u.email}.` : `The email did not go (${sent === 'logged' ? 'email is not set up' : 'sending failed'}). Send them the link yourself: ${link}`);
+  res.redirect(`/admin/users/${u.id}`);
+});
+
 r.post('/users/:id', async (req, res) => {
   const b = req.body;
   const role = D.ROLES[b.role] ? b.role : null;
