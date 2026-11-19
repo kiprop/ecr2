@@ -2,8 +2,8 @@
 <div class="login"><div class="login-right" style="border:0;background:var(--bg)"><div class="login-card card pad" style="padding:28px">
   <img src="<%= bp %>/public/img/egpaf-logo.png" alt="EGPAF" style="width:220px">
   <h2 style="margin:0">You don't have access yet</h2>
-  <p class="muted" style="margin:0">ECR 2.0 is invitation only. <b><%= email || 'Your account' %></b> has not been given access, or access has been removed.</p>
-  <p class="muted" style="margin:0">Ask HQ Legal &amp; Compliance to invite you, then sign in again.</p>
+  <p class="muted" style="margin:0"><b><%= email || 'Your account' %></b> does not have access to ECR 2.0, or its access has been removed. ECR is for EGPAF staff with an @pedaids.org account.</p>
+  <p class="muted" style="margin:0">Ask the ECR administrator (HQ Legal &amp; Compliance) to give you access, then sign in again.</p>
   <a class="btn" href="<%= bp %>/login">Back to sign in</a>
 </div></div></div>
 <%- include('partials/bottom') %>
