@@ -76,12 +76,14 @@ module.exports = function appRoutes(csrfCheck) {
       if (req.method !== 'GET' || !req.query.item || !req.user) return next();
       const o = await db.one(`SELECT o.*, c.name AS country_name FROM obligations o JOIN countries c ON c.code=o.country_code WHERE o.id=$1`, [Number(req.query.item) || 0]);
       if (!o || !inScope(req, o.country_code)) return next();
+      if (!D.canSeeRestricted(req.user) && (D.RESTRICTED_AREAS.has(o.area) || (o.change_type && D.CHANGES[o.change_type] && D.RESTRICTED_AREAS.has(D.CHANGES[o.change_type].area)))) return next();
       const docs = await db.q(`SELECT d.*, u.name AS by_name FROM documents d LEFT JOIN users u ON u.id=d.uploaded_by WHERE obligation_id=$1 ORDER BY uploaded_at DESC`, [o.id]);
       const events = await db.q(`SELECT e.*, u.name AS who FROM events e LEFT JOIN users u ON u.id=e.user_id WHERE obligation_id=$1 ORDER BY at DESC`, [o.id]);
       const dec = D.decorate(o);
       // For HQ looking at an item the country has not submitted: who is responsible for it
       const team = D.canReview(req.user) ? await db.q(`SELECT u.name, u.role FROM users u JOIN user_countries uc ON uc.user_id=u.id WHERE uc.country_code=$1 AND u.role IN ('director','focal') AND u.status<>'inactive' ORDER BY u.role, u.name`, [o.country_code]) : [];
       res.locals.drawer = {
+        fieldsHQ: D.fieldsFor(o), canNAhq: o.area === 'annual',
         team, hqWaiting: D.canReview(req.user) && dec.isOpen && o.status !== 'submitted' && o.area !== 'close',
         o: dec, docs, events, fields: D.fieldsFor(o), payload: o.payload || {},
         canSubmit: canPrepareIn(req, o.country_code) && dec.isOpen && o.area !== 'close',
@@ -96,7 +98,7 @@ module.exports = function appRoutes(csrfCheck) {
 
   // ------------------------------------------------------------ home / overview
   r.get('/', async (req, res) => {
-    if (!D.isPreparer(req.user)) return res.redirect(req.query.item ? `/review?item=${encodeURIComponent(req.query.item)}` : '/overview');
+    if (!D.isPreparer(req.user)) return res.redirect(req.query.item ? `${D.canReview(req.user) ? '/review' : '/overview'}?item=${encodeURIComponent(req.query.item)}` : '/overview');
     const stats = await countryStats(req);
     const obs = (await obligationsInScope(req, `o.status IN ('todo','returned','submitted')`)).map((o) => D.decorate(o));
     const rank = (o) => (o.status === 'returned' ? -100000 : 0) + (o.days === null ? 99999 : o.days);
@@ -116,7 +118,7 @@ module.exports = function appRoutes(csrfCheck) {
     const obs = (await obligationsInScope(req, `o.status IN ('todo','returned','submitted')`)).map((o) => D.decorate(o));
     const operating = stats.filter((c) => c.phase === 'operate' || c.phase === 'close');
     res.render('overview', {
-      title: 'Overview', nav: 'overview', phase,
+      title: 'Overview', nav: 'overview', phase, stats,
       rows: stats.filter((c) => phase === 'all' || c.phase === phase),
       kpi: {
         review: obs.filter((o) => o.status === 'submitted').length,
@@ -137,6 +139,7 @@ module.exports = function appRoutes(csrfCheck) {
   r.get('/countries/:code', async (req, res) => {
     const code = req.params.code.toUpperCase();
     if (!inScope(req, code)) throw httpError(404, 'That country is not assigned to you. Ask the ECR administrator to add it under Users & access.');
+    if (!D.canSeeRestricted(req.user) && ['poa', 'bank'].includes(req.query.tab)) req.query.tab = 'reg';
     const country = await db.one(`SELECT * FROM countries WHERE code=$1`, [code]);
     const curPhase = country.phase === 'closed' ? 'close' : country.phase;
     const view = ['establish', 'operate', 'close'].includes(req.query.phase) ? req.query.phase : curPhase;
@@ -183,9 +186,11 @@ module.exports = function appRoutes(csrfCheck) {
   });
 
   // ------------------------------------------------------------ obligations
+  const isRestricted = (o) => D.RESTRICTED_AREAS.has(o.area) || !!(o.change_type && D.CHANGES[o.change_type] && D.RESTRICTED_AREAS.has(D.CHANGES[o.change_type].area));
   async function loadItem(req, id) {
     const o = await db.one(`SELECT * FROM obligations WHERE id=$1`, [Number(id) || 0]);
     if (!o || !inScope(req, o.country_code)) throw httpError(404, 'Not found');
+    if (!D.canSeeRestricted(req.user) && isRestricted(o)) throw httpError(403, 'Powers of attorney and bank details are restricted.');
     return o;
   }
 
@@ -211,9 +216,30 @@ module.exports = function appRoutes(csrfCheck) {
     res.redirect(back);
   });
 
+  // HQ completes an item for the country (e.g. while no country team is onboarded). Evidence is still required.
+  r.post('/items/:id/record', upload.any(), csrfCheck, async (req, res) => {
+    const o = await loadItem(req, req.params.id);
+    const back = safeReturn(req.body.returnTo);
+    if (!D.canReview(req.user) || !['todo', 'returned'].includes(o.status) || o.area === 'close') throw httpError(403, 'Not allowed.');
+    const existing = await db.one(`SELECT count(*)::int n FROM documents WHERE obligation_id=$1`, [o.id]);
+    const files = (req.files || []).filter((f) => f.size > 0);
+    if (!files.length && !(existing.n && req.body.keep_docs === '1')) { req.flash('Attach the evidence document first.'); return res.redirect(withQuery(back, { item: o.id })); }
+    const payload = { ...(o.payload || {}) };
+    D.fieldsFor(o).forEach((f) => { if (req.body[f.k] !== undefined) payload[f.k] = String(req.body[f.k]).slice(0, 500); });
+    await db.tx(async (c) => {
+      for (const f of files) await c.q(`INSERT INTO documents (obligation_id, label, filename, mime, size_bytes, storage_path, uploaded_by) VALUES ($1,'Evidence',$2,$3,$4,$5,$6)`, [o.id, f.originalname.slice(0, 200), f.mimetype, f.size, f.path, req.user.id]);
+      await c.q(`UPDATE obligations SET status='accepted', payload=$2, submitted_at=now(), submitted_by=$3, reviewed_at=now(), reviewed_by=$3, review_note=NULL WHERE id=$1`, [o.id, JSON.stringify(payload), req.user.id]);
+      await D.audit(req.user.id, 'item.recorded', `completed by HQ for the country${req.body.note ? ': ' + String(req.body.note).slice(0, 900) : ''}`, o.country_code, o.id, c);
+      await D.applyAccepted(c, { ...o, payload }, req.user.id);
+    });
+    await D.syncCountry(o.country_code);
+    req.flash('Recorded as done for the country.');
+    res.redirect(back);
+  });
+
   r.post('/items/:id/na', async (req, res) => {
     const o = await loadItem(req, req.params.id);
-    if (!canPrepareIn(req, o.country_code) || o.area !== 'annual' || !['todo', 'returned'].includes(o.status)) throw httpError(403, 'Not allowed.');
+    if (!(canPrepareIn(req, o.country_code) || D.canReview(req.user)) || o.area !== 'annual' || !['todo', 'returned'].includes(o.status)) throw httpError(403, 'Not allowed.');
     await db.q(`UPDATE obligations SET status='na' WHERE id=$1`, [o.id]);
     await D.audit(req.user.id, 'item.na', (req.body.note || 'marked not applicable this cycle').slice(0, 500), o.country_code, o.id);
     req.flash('Marked not applicable for this cycle.');
@@ -292,7 +318,8 @@ module.exports = function appRoutes(csrfCheck) {
   r.get('/documents/:id', async (req, res) => {
     const d = await db.one(`SELECT d.*, o.country_code, o.area, o.change_type FROM documents d JOIN obligations o ON o.id=d.obligation_id WHERE d.id=$1`, [Number(req.params.id) || 0]);
     if (!d || !inScope(req, d.country_code)) throw httpError(404, 'Not found');
-    const restricted = D.RESTRICTED_AREAS.has(d.area) || (d.change_type && D.CHANGES[d.change_type] && D.RESTRICTED_AREAS.has(D.CHANGES[d.change_type].area));
+    const restricted = isRestricted(d);
+    if (restricted && !D.canSeeRestricted(req.user)) throw httpError(403, 'Powers of attorney and bank details are restricted.');
     if (restricted) await D.audit(req.user.id, 'document.viewed', d.filename, d.country_code, d.obligation_id);
     res.download(d.storage_path, d.filename);
   });

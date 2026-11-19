@@ -64,7 +64,7 @@
       <div class="card empty"><b style="color:var(--ink)">Operations open once registration is complete.</b><br>When HQ confirms registration, the first annual cycle and the registers (board, powers of attorney, bank accounts) open here.</div>
     <% } else { %>
     <nav class="tabs" aria-label="Sections">
-      <% tabs.forEach(([k, l, area]) => { const n = area ? overdueByArea(area) : 0; %>
+      <% tabs.filter(([k]) => d.canSeeRestricted(user) || (k !== 'poa' && k !== 'bank')).forEach(([k, l, area]) => { const n = area ? overdueByArea(area) : 0; %>
         <a class="tab <%= tab === k ? 'on' : '' %>" href="<%= bp %><%= base %>?tab=<%= k %>"><%= l %><% if (n) { %><span class="chip c-red"><%= n %></span><% } %><% if (k === 'poa' || k === 'bank') { %><%- lock %><% } %></a>
       <% }) %>
     </nav>

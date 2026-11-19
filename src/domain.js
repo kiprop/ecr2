@@ -8,7 +8,19 @@ const ROLES = {
   leader:   { label: 'Leadership (view only)', desc: 'Sees status for the countries chosen, or all if none are chosen. Cannot edit or review.', all: false },
   director: { label: 'Country Director', desc: 'Prepares and submits for their countries, and signs off the annual cycle.', all: false },
   focal:    { label: 'Country focal point', desc: 'Prepares and submits evidence for their countries.', all: false },
+  viewer:   { label: 'Country viewer', desc: 'Default for new sign-ins. Read-only view of their own country, without powers of attorney or bank details.', all: false },
 };
+const canSeeRestricted = (u) => u.role !== 'viewer';
+// Match a Microsoft office location (e.g. "Maseru, Lesotho") to a country code.
+const CITY = { LSO: ['maseru'], MWI: ['lilongwe', 'blantyre'], MOZ: ['maputo'], CMR: ['yaounde', 'douala'], COD: ['drc', 'congo', 'kinshasa'], CIV: ['ivory coast', 'cote d', 'abidjan'], SWZ: ['eswatini', 'swaziland', 'mbabane'], KEN: ['nairobi'], TZA: ['dar es salaam', 'dodoma'], UGA: ['kampala'], NGA: ['abuja', 'lagos'], ZWE: ['harare'] };
+function countryFromOffice(countries, ...texts) {
+  const norm = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  for (const t of texts.map(norm).filter(Boolean)) {
+    const hit = countries.find((c) => t.includes(norm(c.name)) || t.split(/[^a-z]+/).includes(c.code.toLowerCase()) || (CITY[c.code] || []).some((w) => t.includes(w)));
+    if (hit) return hit.code;
+  }
+  return null;
+}
 const canReview = (u) => u.role === 'admin' || u.role === 'reviewer';
 const isAdmin = (u) => u.role === 'admin';
 const isPreparer = (u) => u.role === 'director' || u.role === 'focal';
@@ -94,7 +106,7 @@ async function audit(userId, action, detail, countryCode, obligationId, c = db) 
 }
 
 // ---------------------------------------------------------------- settings
-const DEFAULT_SETTINGS = { lead_days: [90, 60, 30, 7], digest: true, cycle_month: 10, horizon_days: 180, coi_due_days: 30 };
+const DEFAULT_SETTINGS = { lead_days: [90, 60, 30, 7], digest: true, cycle_month: 10, horizon_days: 180, coi_due_days: 30, signup_role: 'viewer' };
 async function getSettings() {
   const rows = await db.q(`SELECT key, value FROM settings`);
   const s = { ...DEFAULT_SETTINGS };
@@ -302,6 +314,7 @@ async function notifyInbox(c, userIds, n, actorId) {
 
 module.exports = {
   ROLES, canReview, isAdmin, isPreparer, loadScope, AREAS, RESTRICTED_AREAS, STATUS, PHASES, CLOSE_STAGES, CHANGES,
+  canSeeRestricted, countryFromOffice,
   todayISO, addDays, addMonths, boardIssues, FREQ_MONTHS, daysUntil, fmtDate, fmtShort, monthName, fmtWhen, decorate, fieldsFor,
   audit, getSettings, DEFAULT_SETTINGS, syncCountry, syncAll, openPlan, openAnnualCycles, currentCycle, fyLabel,
   applyAccepted, startClose, countryTeam, reviewers, leadersFor, notifyInbox,

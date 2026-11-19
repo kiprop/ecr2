@@ -14,6 +14,12 @@
       <select class="input" name="cycle_month" style="width:180px" aria-label="Cycle month"><% months.forEach((m, i) => { %><option value="<%= i + 1 %>" <%= s.cycle_month === i + 1 ? 'selected' : '' %>><%= m %></option><% }) %></select>
     </section>
     <section class="card pad row-flex">
+      <div style="flex:1 1 300px"><b>New sign-ins</b><div class="muted small">What happens when an EGPAF colleague who has not been invited signs in. Their country comes from their Microsoft office location; administrators are notified and can change the role.</div></div>
+      <select class="input" name="signup_role" style="width:260px" aria-label="New sign-ins">
+        <% [['viewer', 'Country viewer (read-only, own country)'], ['focal', 'Country focal point (can submit)'], ['off', 'Invitation only (no access)']].forEach(([k, l]) => { %><option value="<%= k %>" <%= (s.signup_role || 'viewer') === k ? 'selected' : '' %>><%= l %></option><% }) %>
+      </select>
+    </section>
+    <section class="card pad row-flex">
       <div style="flex:1 1 300px"><b>Planning horizon</b><div class="muted small">How far ahead register dates (expiries, terms, confirmations) become tasks.</div></div>
       <label class="row-flex small" style="gap:6px"><input class="input" type="number" name="horizon_days" min="30" max="730" value="<%= s.horizon_days %>" style="width:100px"> days</label>
     </section>

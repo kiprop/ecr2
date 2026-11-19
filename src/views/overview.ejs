@@ -4,6 +4,8 @@
     <h1>Good <%= new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening' %>, <%= user.name.split(' ')[0] %></h1>
     <p class="sub">Where each country programme stands in its life cycle, and what needs attention.</p>
   </div>
+  <% if (!stats.length) { %><div class="notice notice-warn">No countries are assigned to you yet. Ask the ECR administrator to give you your countries in Users &amp; access.</div><% } %>
+  <% if (user.role === 'viewer' && stats.length) { %><div class="notice notice-info">You have read-only access to <%= stats.map((c) => c.name).join(', ') %>. The ECR administrator can give you a working role.</div><% } %>
   <div class="grid-kpi">
     <% if (d.canReview(user)) { %><a class="card pad kpi" href="<%= bp %>/review" style="border-color:#A9C3C6"><div class="n" style="color:#0F5A64"><%= kpi.review %></div><div class="l">Waiting for your review →</div></a><% } %>
     <div class="card pad kpi"><div class="n" style="color:#8E1A2B"><%= kpi.overdue %></div><div class="l">Overdue obligations</div></div>

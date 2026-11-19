@@ -69,11 +69,11 @@
       <% if (drawer.hqWaiting) { %>
         <div class="notice notice-info"><%= o.status === 'returned' ? 'Returned to the country office. It comes back here once they resubmit.' : 'Waiting for the country office. Once they submit evidence, Accept and Return appear here.' %></div>
         <div>
-          <div class="label">Responsible</div>
+          <div class="label">Country team</div>
           <% if (drawer.team.length) { %>
             <div style="margin-top:6px;font-size:14px"><%= drawer.team.map((t) => t.name + (t.role === 'director' ? ' (Country Director)' : '')).join(', ') %></div>
           <% } else { %>
-            <div class="notice notice-warn" style="margin-top:6px">Nobody is assigned to <%= o.country_name %> yet, so nobody can submit this.<% if (user.role === 'admin') { %> <a href="<%= bp %>/admin/users">Assign someone in Users &amp; access</a>.<% } %></div>
+            <div class="notice notice-warn" style="margin-top:6px">No Country Director or focal point is assigned to <%= o.country_name %> yet. You can record this item for them below<% if (user.role === 'admin') { %>, or <a href="<%= bp %>/admin/users">assign someone in Users &amp; access</a><% } %>.</div>
           <% } %>
         </div>
         <% if (drawer.team.length && o.status === 'todo') { %>
@@ -83,6 +83,30 @@
             <div><button class="btn" type="submit">Send a reminder</button></div>
           </form>
         <% } %>
+        <details <%= drawer.team.length ? '' : 'open' %>>
+          <summary class="small" style="cursor:pointer;color:var(--pri);font-weight:600">Record it for the country</summary>
+          <form method="post" action="<%= bp %>/items/<%= o.id %>/record" enctype="multipart/form-data" class="stack-s" style="gap:12px;margin-top:10px">
+            <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="returnTo" value="<%= back %>">
+            <div class="muted small">Marks it done with your evidence, as if submitted and accepted. Use it while the country team is not on ECR yet.</div>
+            <% drawer.fieldsHQ.forEach((f) => { %>
+              <label class="field"><%= f.label %>
+                <% if (f.type === 'select') { %><select class="input" name="<%= f.k %>"><% f.options.forEach((op) => { %><option <%= drawer.payload[f.k] === op ? 'selected' : '' %>><%= op %></option><% }) %></select>
+                <% } else { %><input class="input" type="<%= f.type %>" name="<%= f.k %>" value="<%= drawer.payload[f.k] || '' %>"><% } %>
+              </label>
+            <% }) %>
+            <label class="field">Evidence<span class="file-drop"><input type="file" name="file" multiple></span></label>
+            <% if (drawer.docs.length) { %><label class="check-row"><input type="checkbox" name="keep_docs" value="1">The documents already attached are enough</label><% } %>
+            <label class="field">Note (optional)<input class="input" name="note"></label>
+            <div><button class="btn btn-pri" type="submit">Record as done</button></div>
+          </form>
+          <% if (drawer.canNAhq) { %>
+            <form method="post" action="<%= bp %>/items/<%= o.id %>/na" class="row-flex" style="margin-top:10px">
+              <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="returnTo" value="<%= back %>">
+              <input class="input" name="note" placeholder="Why it does not apply this year" style="flex:1 1 200px">
+              <button class="btn" type="submit">Not applicable this year</button>
+            </form>
+          <% } %>
+        </details>
         <% if (o.due_date) { %>
           <details>
             <summary class="small" style="cursor:pointer;color:var(--pri);font-weight:600">Change the due date for <%= o.country_name %></summary>

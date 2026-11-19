@@ -3,7 +3,8 @@ const express = require('express');
 const { Issuer, generators } = require('openid-client');
 const config = require('./config');
 const db = require('./db');
-const { audit } = require('./domain');
+const D = require('./domain');
+const { audit } = D;
 
 const router = express.Router();
 const HINT = 'ecr2.hint';
@@ -46,7 +47,7 @@ router.get('/auth/login', async (req, res, next) => {
     const nonce = generators.nonce();
     req.session.oidc = { codeVerifier, state, nonce, returnTo: req.query.returnTo || '' };
     const url = client.authorizationUrl({
-      scope: 'openid profile email', code_challenge: generators.codeChallenge(codeVerifier), code_challenge_method: 'S256', state, nonce,
+      scope: 'openid profile email User.Read', code_challenge: generators.codeChallenge(codeVerifier), code_challenge_method: 'S256', state, nonce,
       // Silent single sign-on when the browser already has a Microsoft session; the account picker only after an explicit sign-out or "switch account".
       ...(req.query.switch === '1' ? { prompt: 'select_account' } : {}),
       // Tell Microsoft which account to use, so it skips the picker even without a browser session.
@@ -67,21 +68,48 @@ router.get('/auth/callback', async (req, res, next) => {
     const claims = tokens.claims();
     const email = String(claims.preferred_username || claims.email || claims.upn || '').toLowerCase();
     delete req.session.oidc;
-    await finishSignIn(req, res, { email, name: claims.name, oid: claims.oid, returnTo: o.returnTo });
+    const profile = await graphProfile(tokens.access_token);
+    await finishSignIn(req, res, { email, name: claims.name, oid: claims.oid, returnTo: o.returnTo, profile });
   } catch (e) { next(e); }
 });
 
-async function finishSignIn(req, res, { email, name, oid, returnTo }) {
+// Office location and job title from Microsoft (same as GAP), used to place new people in their country.
+async function graphProfile(accessToken) {
+  if (!accessToken) return null;
+  try {
+    const r = await fetch('https://graph.microsoft.com/v1.0/me?$select=officeLocation,country,jobTitle,department', { headers: { Authorization: `Bearer ${accessToken}` }, signal: AbortSignal.timeout(5000) });
+    return r.ok ? await r.json() : null;
+  } catch { return null; }
+}
+
+async function finishSignIn(req, res, { email, name, oid, returnTo, profile }) {
   let user = await db.one(`SELECT * FROM users WHERE email=$1`, [email]);
   if (!user && config.auth.superAdmins.includes(email)) {
     user = await db.one(`INSERT INTO users (email, name, role, status) VALUES ($1,$2,'admin','active') RETURNING *`, [email, name || email]);
     await audit(user.id, 'user.bootstrap', `${email} created as administrator from SUPER_ADMINS`);
   }
+  // Self sign-up: any @pedaids.org account gets the default role, placed in the country of its Microsoft office location.
+  const s = await D.getSettings();
+  if (!user && /@pedaids\.org$/i.test(email) && D.ROLES[s.signup_role] && !D.ROLES[s.signup_role].all) {
+    const countries = await db.q(`SELECT code, name FROM countries`);
+    const code = D.countryFromOffice(countries, profile && profile.officeLocation, profile && profile.country);
+    user = await db.tx(async (c) => {
+      const u = await c.one(`INSERT INTO users (email, name, title, role, status, office_location, self_signup) VALUES ($1,$2,$3,$4,'active',$5,true) RETURNING *`,
+        [email, name || email, (profile && profile.jobTitle) || null, s.signup_role, (profile && profile.officeLocation) || null]);
+      if (code) await c.q(`INSERT INTO user_countries VALUES ($1,$2)`, [u.id, code]);
+      const where = code ? countries.find((x) => x.code === code).name : 'no country (office location not matched)';
+      await audit(u.id, 'user.self_signup', `${u.name} signed in for the first time as ${D.ROLES[s.signup_role].label}, ${where}${profile && profile.officeLocation ? ' · office: ' + profile.officeLocation : ''}`, code, null, c);
+      const admins = (await c.q(`SELECT id FROM users WHERE role='admin' AND status='active'`)).map((r) => r.id);
+      await D.notifyInbox(c, admins, { kind: 'signup', title: `New user: ${u.name}`, body: `${D.ROLES[s.signup_role].label} · ${where}. Review their role and countries.`, link: `/admin/users/${u.id}`, code }, null);
+      return u;
+    });
+  }
   if (!user || user.status === 'inactive') {
     await audit(null, 'signin.denied', email || 'unknown account');
     return res.status(403).render('noaccess', { title: 'No access', email });
   }
-  await db.q(`UPDATE users SET status='active', last_login_at=now(), entra_oid=COALESCE($2, entra_oid), name=CASE WHEN status='invited' AND $3::text IS NOT NULL THEN $3 ELSE name END WHERE id=$1`, [user.id, oid || null, name || null]);
+  await db.q(`UPDATE users SET status='active', last_login_at=now(), entra_oid=COALESCE($2, entra_oid), name=CASE WHEN status='invited' AND $3::text IS NOT NULL THEN $3 ELSE name END,
+              office_location=COALESCE($4, office_location), title=COALESCE(title, $5) WHERE id=$1`, [user.id, oid || null, name || null, (profile && profile.officeLocation) || null, (profile && profile.jobTitle) || null]);
   await audit(user.id, 'signin', email);
   req.session.regenerate((err) => {
     if (err) throw err;
@@ -107,4 +135,4 @@ router.post('/auth/logout', (req, res) => {
   });
 });
 
-module.exports = { router };
+module.exports = { router, finishSignIn };

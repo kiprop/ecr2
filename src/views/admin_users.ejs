@@ -1,11 +1,11 @@
 <%- include('partials/top') %>
 <div class="stack" style="gap:18px">
   <div class="row-flex" style="justify-content:space-between;align-items:flex-end">
-    <div><h1>Users &amp; access</h1><p class="sub">Invitation only. People sign in with their EGPAF Microsoft account; their role and countries decide what they see.</p></div>
+    <div><h1>Users &amp; access</h1><p class="sub">People sign in with their EGPAF Microsoft account. Colleagues who were not invited join as set under Settings, placed in the country of their office location; give them a role here.</p></div>
     <a class="btn btn-pri" href="<%= bp %>/admin/users/new">Invite a person</a>
   </div>
   <div class="pills">
-    <% [['all', 'Everyone'], ['admin', 'Administrators'], ['reviewer', 'HQ reviewers'], ['leader', 'Leadership'], ['director', 'Country Directors'], ['focal', 'Focal points']].forEach(([k, l]) => { %>
+    <% [['all', 'Everyone'], ['admin', 'Administrators'], ['reviewer', 'HQ reviewers'], ['leader', 'Leadership'], ['director', 'Country Directors'], ['focal', 'Focal points'], ['viewer', 'Country viewers']].forEach(([k, l]) => { %>
       <a class="pill <%= role === k ? 'on' : '' %>" href="<%= bp %>/admin/users<%= k === 'all' ? '' : '?role=' + k %>"><%= l %> · <%= counts[k] || 0 %></a>
     <% }) %>
   </div>
@@ -14,9 +14,9 @@
     <tbody>
       <% users.forEach((u) => { const st = { active: ['Active', 'c-green'], invited: ['Invited', 'c-blue'], inactive: ['Deactivated', 'c-muted'] }[u.status]; %>
         <tr>
-          <td><b style="font-weight:600"><%= u.name %></b><div class="muted small"><%= u.email %><%= u.title ? ' · ' + u.title : '' %></div></td>
+          <td><b style="font-weight:600"><%= u.name %></b><div class="muted small"><%= u.email %><%= u.title ? ' · ' + u.title : '' %><%= u.office_location ? ' · ' + u.office_location : '' %></div><% if (u.self_signup && u.role === 'viewer') { %><span class="chip c-orange" style="margin-top:4px">New, needs a role</span><% } %></td>
           <td><%= d.ROLES[u.role].label %></td>
-          <td class="small"><%= d.ROLES[u.role].all || !u.country_names.length ? 'All countries' : u.country_names.join(', ') %></td>
+          <td class="small"><%= d.ROLES[u.role].all || (u.role === 'leader' && !u.country_names.length) ? 'All countries' : u.country_names.length ? u.country_names.join(', ') : 'None yet' %></td>
           <td class="muted small"><%= u.last_login_at ? d.fmtWhen(u.last_login_at) : 'Never' %></td>
           <td><span class="chip <%= st[1] %>"><%= st[0] %></span></td>
           <td style="text-align:right"><a class="btn btn-sm" href="<%= bp %>/admin/users/<%= u.id %>">Edit</a></td>

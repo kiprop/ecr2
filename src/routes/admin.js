@@ -185,7 +185,7 @@ r.post('/settings', async (req, res) => {
     return res.redirect('/admin/settings');
   }
   const lead = [].concat(b.lead_days || []).map(Number).filter((n) => n > 0).sort((a, c) => c - a);
-  const vals = { lead_days: lead, digest: b.digest === 'on', cycle_month: Math.min(12, Math.max(1, Number(b.cycle_month) || 10)), horizon_days: Math.min(730, Math.max(30, Number(b.horizon_days) || 180)), coi_due_days: Math.max(1, Number(b.coi_due_days) || 30) };
+  const vals = { signup_role: ['viewer', 'focal', 'off'].includes(b.signup_role) ? b.signup_role : 'viewer', lead_days: lead, digest: b.digest === 'on', cycle_month: Math.min(12, Math.max(1, Number(b.cycle_month) || 10)), horizon_days: Math.min(730, Math.max(30, Number(b.horizon_days) || 180)), coi_due_days: Math.max(1, Number(b.coi_due_days) || 30) };
   for (const [k, v] of Object.entries(vals)) await db.q(`INSERT INTO settings VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value`, [k, JSON.stringify(v)]);
   await D.audit(req.user.id, 'settings.saved', JSON.stringify(vals));
   await D.syncAll();
