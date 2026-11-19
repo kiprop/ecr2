@@ -68,9 +68,12 @@ r.post('/users/:id', async (req, res) => {
       await D.audit(req.user.id, 'user.invited', `invited ${name} as ${D.ROLES[role].label} for ${names}`, null, null, c);
       await D.notifyInbox(c, [u.id], { kind: 'welcome', title: 'Welcome to ECR 2.0', body: `${req.user.name} gave you access as ${D.ROLES[role].label} for ${names}.`, link: '/' });
     });
-    await graph.sendMail(email, 'You have access to the EGPAF Compliance Registry (ECR 2.0)',
+    const sent = await graph.sendMail(email, 'You have access to the EGPAF Compliance Registry (ECR 2.0)',
       `<p>Hello ${name},</p><p>${req.user.name} has given you access to ECR 2.0 as <b>${D.ROLES[role].label}</b> for ${names}.</p><p>Sign in with your EGPAF Microsoft account: <a href="${config.appBaseUrl}${config.basePath}/">${config.appBaseUrl}${config.basePath}/</a></p>`);
-    req.flash(`Invitation recorded for ${email}. They sign in with their Microsoft account.`);
+    const link = `${config.appBaseUrl}${config.basePath}/`;
+    req.flash(sent === 'sent' ? `Invitation emailed to ${email}.`
+      : sent === 'logged' ? `${name} has access, but email is not set up, so no invitation was sent. Send them the link yourself: ${link}`
+      : `${name} has access, but the invitation email failed. Check Settings, Send me a test email. Send them the link yourself: ${link}`);
     return res.redirect('/admin/users');
   }
 
