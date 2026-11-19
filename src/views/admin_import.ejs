@@ -1,0 +1,44 @@
+<%- include('partials/top') %>
+<div class="stack" style="gap:18px">
+  <div>
+    <a class="small" href="<%= bp %>/admin/templates">&larr; Templates</a>
+    <h1>Import requirements: <%= plan.countryName %></h1>
+    <p class="sub">From <b><%= fileName %></b><%= plan.by ? ', filled in by ' + plan.by : '' %>. Nothing is saved until you click <b>Apply</b>. Changes apply from <%= plan.countryName %>'s next cycle or plan; the current cycle is not altered.</p>
+  </div>
+  <div class="grid-kpi">
+    <div class="card pad kpi"><div class="n"><%= plan.local.filter((l) => !l.excluded).length %></div><div class="l">standard items adapted</div></div>
+    <div class="card pad kpi"><div class="n"><%= plan.local.filter((l) => l.excluded).length %></div><div class="l">not used in <%= plan.countryName %></div></div>
+    <div class="card pad kpi"><div class="n"><%= plan.add.length %></div><div class="l">added for <%= plan.countryName %> only</div></div>
+    <div class="card pad kpi"><div class="n"><%= plan.unchanged %></div><div class="l">already up to date</div></div>
+  </div>
+  <% if (plan.warnings.length) { %>
+    <div class="notice notice-warn"><b>Check these rows in the file:</b><ul style="margin:6px 0 0 18px;padding:0"><% plan.warnings.forEach((w) => { %><li><%= w %></li><% }) %></ul></div>
+  <% } %>
+  <% if (plan.local.length) { %>
+  <section class="card overflow">
+    <div class="pad"><b>Standard items for <%= plan.countryName %></b></div>
+    <div class="table-wrap"><table><thead><tr><th>Stage</th><th>No.</th><th>Standard requirement</th><th>For <%= plan.countryName %></th><th>Due</th><th>Reference</th></tr></thead><tbody>
+    <% plan.local.forEach((l) => { %>
+      <tr><td><%= stages[l.phase] %></td><td><%= l.seq %></td><td class="muted small"><%= l.standard %></td>
+        <td><% if (l.excluded) { %><span class="chip c-orange">Not used in this country</span><% } else if (l.text) { %><b><%= l.text %></b><% } else { %><span class="muted">Standard wording</span><% } %>
+          <% if (l.was.text || l.was.due || l.was.excluded) { %><div class="muted small">was: <%= l.was.excluded ? 'not used' : (l.was.text || 'standard wording') + (l.was.due ? ', +' + l.was.due + ' days' : '') %></div><% } %></td>
+        <td><%= l.due ? '+' + l.due + ' days' : '' %></td><td class="muted small"><%= l.ref %></td></tr>
+    <% }) %>
+    </tbody></table></div>
+  </section>
+  <% } %>
+  <% if (plan.add.length) { %>
+  <section class="card overflow">
+    <div class="pad"><b>New items for <%= plan.countryName %> only</b></div>
+    <div class="table-wrap"><table><thead><tr><th>Stage</th><th>Requirement</th><th>Due</th><th>Reference</th></tr></thead><tbody>
+    <% plan.add.forEach((a) => { %><tr><td><%= stages[a.phase] %></td><td><b><%= a.text %></b></td><td><%= a.phase === 'close' ? 'Stage ' + a.stage : '+' + a.due + ' days' %></td><td class="muted small"><%= a.ref %></td></tr><% }) %>
+    </tbody></table></div>
+  </section>
+  <% } %>
+  <form method="post" action="<%= bp %>/admin/templates/import/apply" class="row-flex">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <% if (plan.local.length || plan.add.length) { %><button class="btn btn-pri" name="action" value="apply">Apply <%= plan.local.length + plan.add.length %> changes</button><% } else { %><div class="notice notice-info">Everything in this file is already in ECR. Nothing to apply.</div><% } %>
+    <button class="btn" name="action" value="cancel">Cancel</button>
+  </form>
+</div>
+<%- include('partials/bottom') %>

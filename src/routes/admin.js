@@ -4,6 +4,9 @@ const db = require('../db');
 const D = require('../domain');
 const graph = require('../graph');
 const mail = require('../email');
+const multer = require('multer');
+const reqimport = require('../reqimport');
+const xlsxUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
 
 const r = express.Router();
 r.use((req, res, next) => {
@@ -114,6 +117,33 @@ r.get('/templates', async (req, res) => {
   res.render('admin_templates', { title: 'Templates', nav: 'templates', phase, items, locals, countries, stages: D.CLOSE_STAGES });
 });
 
+// Country requirements in Excel: download the template, upload a filled one, preview, apply
+r.get('/templates/requirements.xlsx', async (req, res) => {
+  const { buffer, name } = await reqimport.buildTemplate(String(req.query.country || ''));
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
+  res.send(Buffer.from(buffer));
+});
+
+r.post('/templates/import', xlsxUpload.single('file'), async (req, res) => {
+  if (!req.body || req.body._csrf !== req.session.csrf) return res.status(403).render('error', { title: 'Session expired', message: 'Your session expired. Go back, reload the page and try again.' });
+  if (!req.file) { req.flash('Choose the filled-in Excel file first.'); return res.redirect('/admin/templates'); }
+  const out = await reqimport.parse(req.file.buffer);
+  if (out.error) { req.flash(out.error); return res.redirect('/admin/templates'); }
+  req.session.importPlan = out.plan;
+  res.render('admin_import', { title: 'Import requirements', nav: 'templates', plan: out.plan, stages: reqimport.STAGES, fileName: req.file.originalname });
+});
+
+r.post('/templates/import/apply', async (req, res) => {
+  const plan = req.session.importPlan;
+  if (!plan) { req.flash('Nothing to import. Upload the file again.'); return res.redirect('/admin/templates'); }
+  if (req.body.action === 'cancel') { delete req.session.importPlan; req.flash('Import cancelled. Nothing was changed.'); return res.redirect('/admin/templates'); }
+  await reqimport.apply(plan, req.user.id);
+  delete req.session.importPlan;
+  req.flash(`${plan.countryName}: requirements imported. They apply from its next cycle or plan.`);
+  res.redirect('/admin/templates');
+});
+
 r.post('/templates', async (req, res) => {
   const b = req.body; const phase = ['setup', 'annual', 'close'].includes(b.phase) ? b.phase : 'annual';
   if (b.action === 'add') {
@@ -138,9 +168,10 @@ r.post('/templates', async (req, res) => {
   if (b.action === 'local') {
     const text = String(b.text || '').trim().slice(0, 500) || null;
     const due = Number(b.due_days) > 0 ? Number(b.due_days) : null;
-    if (text || due) await db.q(`INSERT INTO template_local (template_id, country_code, text, due_days) VALUES ($1,$2,$3,$4) ON CONFLICT (template_id, country_code) DO UPDATE SET text=EXCLUDED.text, due_days=EXCLUDED.due_days`, [b.id, b.country, text, due]);
+    const excluded = b.excluded === 'on';
+    if (text || due || excluded) await db.q(`INSERT INTO template_local (template_id, country_code, text, due_days, excluded) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (template_id, country_code) DO UPDATE SET text=EXCLUDED.text, due_days=EXCLUDED.due_days, excluded=EXCLUDED.excluded`, [b.id, b.country, text, due, excluded]);
     else await db.q(`DELETE FROM template_local WHERE template_id=$1 AND country_code=$2`, [b.id, b.country]);
-    await D.audit(req.user.id, 'template.localised', `${b.country} #${b.id}: ${text || '(standard wording)'}${due ? ', due +' + due + ' days' : ''}`);
+    await D.audit(req.user.id, 'template.localised', `${b.country} #${b.id}: ${excluded ? 'not used in this country' : (text || '(standard wording)') + (due ? ', due +' + due + ' days' : '')}`);
     req.flash('Local version saved.');
   }
   res.redirect(`/admin/templates?phase=${phase}`);

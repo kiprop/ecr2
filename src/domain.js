@@ -182,7 +182,7 @@ async function openPlan(c, code, kind, label, userId) {
   const exists = await c.one(`SELECT id FROM cycles WHERE country_code=$1 AND kind=$2 AND label=$3`, [code, kind, label]);
   if (exists) return null;
   const cyc = await c.one(`INSERT INTO cycles (country_code, kind, label) VALUES ($1,$2,$3) RETURNING id, opened_on`, [code, kind, label]);
-  const tpls = await c.q(`SELECT t.*, l.text AS local, l.due_days AS local_due FROM templates t LEFT JOIN template_local l ON l.template_id=t.id AND l.country_code=$2 WHERE t.phase=$1 AND t.active AND (t.country_code IS NULL OR t.country_code=$2) ORDER BY t.seq`, [kind, code]);
+  const tpls = await c.q(`SELECT t.*, l.text AS local, l.due_days AS local_due FROM templates t LEFT JOIN template_local l ON l.template_id=t.id AND l.country_code=$2 WHERE t.phase=$1 AND t.active AND (t.country_code IS NULL OR t.country_code=$2) AND NOT COALESCE(l.excluded, false) ORDER BY t.seq`, [kind, code]);
   const area = kind;
   for (const t of tpls) {
     const title = t.local || t.text;

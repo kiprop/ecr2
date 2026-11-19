@@ -2,6 +2,21 @@
 <% const meta = { setup: ['Establish', 'Completed once, when a country office registers. Due dates count from the day the country is added.'], annual: ['Operate · annual cycle', 'A new cycle opens for every operating country each year. Due dates count from the day the cycle opens.'], close: ['Close out', 'Used only when a programme closes. Steps sit in four gated stages.'] }; %>
 <div class="stack" style="gap:18px">
   <div><h1>Requirement templates</h1><p class="sub">One standard checklist per phase, shared by all countries. Where a country's law differs, add local wording or a local due date, or add an item for that country only. Changes apply from each country's next cycle or plan.</p></div>
+  <section class="card pad" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px;align-items:end">
+    <div class="stack-s" style="gap:6px">
+      <b>Country requirements from Excel</b>
+      <span class="muted small">Each country fills in one template: which standard items apply, its own wording and deadlines, and items that exist only there. Pick a country to include what is already set for it.</span>
+      <form method="get" action="<%= bp %>/admin/templates/requirements.xlsx" class="row-flex" style="gap:8px;margin-top:4px">
+        <select class="input" name="country" style="width:200px" aria-label="Country"><option value="">Blank template</option><% countries.forEach((c) => { %><option value="<%= c.code %>"><%= c.name %></option><% }) %></select>
+        <button class="btn" type="submit">Download template</button>
+      </form>
+    </div>
+    <form method="post" action="<%= bp %>/admin/templates/import" enctype="multipart/form-data" class="stack-s" style="gap:6px">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <span class="muted small">Upload a filled-in template. You will see every change before anything is saved.</span>
+      <div class="row-flex" style="gap:8px"><input class="input" type="file" name="file" accept=".xlsx" required style="flex:1 1 220px"><button class="btn btn-pri" type="submit">Upload and preview</button></div>
+    </form>
+  </section>
   <nav class="tabs"><% Object.entries(meta).forEach(([k, m]) => { %><a class="tab <%= phase === k ? 'on' : '' %>" href="<%= bp %>/admin/templates?phase=<%= k %>"><%= m[0] %></a><% }) %></nav>
   <p class="muted" style="margin:0"><%= meta[phase][1] %></p>
   <section class="card overflow">
@@ -9,7 +24,7 @@
       <details class="row" style="display:block;<%= t.active ? '' : 'opacity:.55' %>">
         <summary style="display:flex;gap:14px;align-items:center;cursor:pointer;list-style:none">
           <span class="mono muted small" style="width:24px"><%= t.seq %></span>
-          <span class="grow"><% if (t.country_code) { %><span class="chip c-blue" style="margin-right:6px"><%= t.country_name %> only</span><% } %><%= t.text %><% loc.forEach((l) => { %><span class="meta"><%= l.country_name %>: <%= l.text || 'standard wording' %><%= l.due_days ? ' · due +' + l.due_days + ' days' : '' %></span><% }) %></span>
+          <span class="grow"><% if (t.country_code) { %><span class="chip c-blue" style="margin-right:6px"><%= t.country_name %> only</span><% } %><%= t.text %><% loc.forEach((l) => { %><span class="meta"><%= l.country_name %>: <%= l.excluded ? 'not used in this country' : (l.text || 'standard wording') + (l.due_days ? ' · due +' + l.due_days + ' days' : '') %></span><% }) %></span>
           <span class="muted small"><%= phase === 'close' ? 'Stage ' + t.stage : 'Due +' + t.due_days + ' days' %></span>
           <% if (!t.active) { %><span class="chip c-muted">Retired</span><% } %>
         </summary>
@@ -24,6 +39,7 @@
             <select class="input" name="country" style="width:180px" aria-label="Country"><% countries.forEach((c) => { %><option value="<%= c.code %>"><%= c.name %></option><% }) %></select>
             <input class="input" name="text" placeholder="Local wording (blank keeps the standard wording)" style="flex:1 1 300px">
             <% if (phase !== 'close') { %><label class="row-flex small" style="gap:6px">Due +<input class="input" name="due_days" type="number" min="1" placeholder="std" style="width:80px">days</label><% } %>
+            <label class="row-flex small" style="gap:6px"><input type="checkbox" name="excluded">Not used in this country</label>
             <button class="btn btn-sm">Save local version</button>
           </form>
         </div>
